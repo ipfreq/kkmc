@@ -1,0 +1,675 @@
+<title>محطات رفع حفر الباطن</title><link id="fonts" rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Readex+Pro:wght@500;600;700&display=swap"><style id="app-css">
+/* Layout: a field-office sheet. Header + KPI strip, then two tabs: an RTL Gantt (sticky task list on the right, time flowing right-to-left) and an editable work plan. */
+:root{
+  --bg:#F2F5F6; --surface:#FFFFFF; --surface-2:#E9EFF1; --ink:#0F2129; --muted:#5A6B73; --line:#D4DDE1; --line-soft:#E6ECEF;
+  --accent:#0A6C88; --accent-ink:#FFFFFF; --accent-soft:#DCEDF2;
+  --ok:#2C7A4D; --ok-soft:#E0F0E6; --warn:#A86E12; --warn-soft:#F9EDD6; --bad:#BF3F2B; --bad-soft:#FAE2DD;
+  --c1:#3D6F9E; --c2:#7357A6; --c3:#A87512; --c4:#8A6648; --c5:#12837F; --c6:#B0466A; --c7:#4A8636; --c8:#56636E;
+  --weekend:rgba(10,108,136,.045);
+  --font-display:'Readex Pro','IBM Plex Sans Arabic',Tahoma,sans-serif;
+  --font-body:'IBM Plex Sans Arabic','Segoe UI',Tahoma,Arial,sans-serif;
+  --side:452px; --row:34px; --radius:8px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0D1519; --surface:#142027; --surface-2:#1A2830; --ink:#E2EBEE; --muted:#93A5AD; --line:#2A3A42; --line-soft:#1F2D34;
+  --accent:#4FB2CE; --accent-ink:#06222B; --accent-soft:#16343F;
+  --ok:#5FC08A; --ok-soft:#163327; --warn:#E0A640; --warn-soft:#3A2D14; --bad:#EF7A66; --bad-soft:#3D1E19;
+  --c1:#6E9DCB; --c2:#A48AD6; --c3:#D9A443; --c4:#BC9878; --c5:#48B8B2; --c6:#DD7A9C; --c7:#7DBC67; --c8:#8C9AA6;
+  --weekend:rgba(79,178,206,.06); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0D1519; --surface:#142027; --surface-2:#1A2830; --ink:#E2EBEE; --muted:#93A5AD; --line:#2A3A42; --line-soft:#1F2D34;
+  --accent:#4FB2CE; --accent-ink:#06222B; --accent-soft:#16343F;
+  --ok:#5FC08A; --ok-soft:#163327; --warn:#E0A640; --warn-soft:#3A2D14; --bad:#EF7A66; --bad-soft:#3D1E19;
+  --c1:#6E9DCB; --c2:#A48AD6; --c3:#D9A443; --c4:#BC9878; --c5:#48B8B2; --c6:#DD7A9C; --c7:#7DBC67; --c8:#8C9AA6;
+  --weekend:rgba(79,178,206,.06); color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:14px;line-height:1.55;direction:rtl}
+#app{max-width:1440px;margin-inline:auto;padding:20px 20px 40px;display:flex;flex-direction:column;gap:16px}
+@media (max-width:600px){#app{padding:14px 16px 32px}}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
+h1,h2,h3{font-family:var(--font-display);text-wrap:balance;margin:0;font-weight:600}
+
+/* header */
+.top{display:flex;flex-wrap:wrap;gap:14px 24px;align-items:flex-end;justify-content:space-between;border-bottom:2px solid var(--ink);padding-bottom:14px}
+.brand{min-width:0;display:flex;flex-direction:column;gap:2px}
+.eyebrow{font-size:12px;letter-spacing:.04em;color:var(--accent);font-weight:600}
+.top h1{font-size:clamp(22px,3.2vw,30px);line-height:1.25}
+.sub{color:var(--muted);font-size:13px}
+.savebox{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;padding:4px 10px;border-radius:999px;background:var(--surface-2);color:var(--muted);white-space:nowrap}
+.chip::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.chip.ok{background:var(--ok-soft);color:var(--ok)} .chip.warn{background:var(--warn-soft);color:var(--warn)} .chip.bad{background:var(--bad-soft);color:var(--bad)}
+
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:6px 12px;cursor:pointer;font-size:13px;white-space:nowrap}
+.btn:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+.btn:disabled{opacity:.45;cursor:default}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.btn.primary:hover:not(:disabled){filter:brightness(1.08);color:var(--accent-ink)}
+.btn.danger{color:var(--bad)} .btn.danger:hover{border-color:var(--bad);color:var(--bad)}
+.btn.sm{padding:3px 8px;font-size:12px}
+
+.banner{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;background:var(--accent-soft);border-radius:var(--radius);padding:10px 14px;font-size:13px}
+.banner.warn{background:var(--warn-soft)}
+.banner p{margin:0;flex:1 1 280px}
+
+/* KPIs */
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+@media (max-width:900px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.kpi .k{font-size:12px;color:var(--muted)}
+.kpi .v{font-family:var(--font-display);font-size:24px;font-weight:600;line-height:1.2;font-variant-numeric:tabular-nums}
+.kpi .v small{font-size:13px;font-weight:500;color:var(--muted);margin-inline-start:4px}
+.kpi .s{font-size:12.5px;color:var(--muted)}
+.dual{position:relative;height:8px;border-radius:4px;background:var(--surface-2);overflow:hidden;margin-top:4px}
+.dual i{position:absolute;inset-block:0;right:0;border-radius:4px}
+.dual .pl{background:color-mix(in srgb,var(--accent) 30%,transparent)}
+.dual .ac{background:var(--accent);inset-block:2px}
+.pill{display:inline-block;font-size:11.5px;padding:1px 8px;border-radius:999px;font-weight:600;vertical-align:middle}
+.pill.ok{background:var(--ok-soft);color:var(--ok)} .pill.warn{background:var(--warn-soft);color:var(--warn)} .pill.bad{background:var(--bad-soft);color:var(--bad)} .pill.n{background:var(--surface-2);color:var(--muted)}
+
+/* tabs + toolbar */
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line)}
+.tabs button{border:0;background:none;padding:8px 14px;cursor:pointer;font-family:var(--font-display);font-weight:500;font-size:15px;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.toolbar .grow{flex:1 1 0}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--surface)}
+.seg button{border:0;background:none;padding:6px 11px;cursor:pointer;font-size:13px;color:var(--muted)}
+.seg button+button{border-inline-start:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--accent-soft);color:var(--ink);font-weight:600}
+select.btn{padding-inline-end:28px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:12px;height:12px;border-radius:3px;background:var(--c)}
+.hint{margin:0;font-size:12.5px;color:var(--muted)}
+
+/* gantt */
+.gantt{position:relative;overflow:auto;max-height:72vh;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);overscroll-behavior:contain}
+.g{position:relative}
+.g-head{position:sticky;top:0;z-index:5;display:flex;background:var(--surface);border-bottom:1px solid var(--line)}
+.r{display:flex;height:var(--row);border-bottom:1px solid var(--line-soft)}
+.side{position:sticky;right:0;z-index:3;flex:0 0 var(--side);width:var(--side);background:var(--surface);display:grid;grid-template-columns:44px minmax(0,1fr) 70px 50px 48px;align-items:center;border-inline-end:1px solid var(--line);font-size:13px}
+.side>*{padding-inline:6px;min-width:0}
+.g-head .side{z-index:6;height:56px;font-size:11.5px;color:var(--muted);font-weight:600;letter-spacing:.02em}
+.time-h{position:relative;height:56px;flex:none}
+.tier{position:absolute;inset-inline:0;height:28px}
+.tier.t1{top:0;border-bottom:1px solid var(--line-soft)} .tier.t2{top:28px}
+.u{position:absolute;top:0;height:28px;display:flex;align-items:center;justify-content:center;font-size:11.5px;color:var(--muted);border-inline-end:1px solid var(--line-soft);white-space:nowrap;overflow:hidden;font-variant-numeric:tabular-nums}
+.t1 .u{font-weight:600;color:var(--ink);justify-content:flex-start;padding-inline-start:8px}
+.tc{position:relative;flex:none}
+.g-body{position:relative}
+.overlay{position:absolute;top:0;bottom:0;right:var(--side);pointer-events:none;z-index:0}
+.overlay .vl{position:absolute;top:0;bottom:0;width:1px;background:var(--line-soft)}
+.overlay .vl.strong{background:var(--line)}
+.overlay .we{position:absolute;top:0;bottom:0;background:var(--weekend)}
+.overlay .today{position:absolute;top:0;bottom:0;width:2px;background:var(--bad);z-index:4}
+.overlay .today span{position:absolute;top:2px;right:4px;font-size:10.5px;font-weight:700;color:var(--bad);background:var(--surface);padding:0 4px;border-radius:3px;white-space:nowrap}
+.r:hover .side,.r:hover .tc{background:color-mix(in srgb,var(--accent) 5%,var(--surface))}
+.r:hover .tc{background:color-mix(in srgb,var(--accent) 4%,transparent)}
+.r.ph .side{background:var(--surface-2);font-weight:600}
+.r.ph{background:color-mix(in srgb,var(--surface-2) 45%,transparent)}
+.wbs{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
+.nm{display:flex;align-items:center;gap:6px;border:0;background:none;text-align:right;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;height:100%;padding-block:0}
+.nm .t{overflow:hidden;text-overflow:ellipsis}
+.nm:hover .t{color:var(--accent);text-decoration:underline;text-underline-offset:3px}
+.tag{flex:none;font-size:10.5px;font-weight:600;padding:0 5px;border-radius:4px;background:var(--surface-2);color:var(--muted)}
+.dot{flex:none;width:8px;height:8px;border-radius:50%;background:var(--line)}
+.dot.done{background:var(--ok)} .dot.active{background:var(--accent)} .dot.late{background:var(--bad)}
+.caret{flex:none;width:18px;height:18px;display:inline-grid;place-items:center;border-radius:4px;color:var(--muted);transition:transform .15s}
+.collapsed .caret{transform:rotate(90deg)}
+.swatch{flex:none;width:10px;height:10px;border-radius:2px;background:var(--c)}
+.c-s,.c-d,.c-p{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.c-p{font-weight:600;color:var(--ink)}
+.bar{position:absolute;top:8px;height:18px;border-radius:4px;background:color-mix(in srgb,var(--c) 26%,var(--surface));border:1px solid color-mix(in srgb,var(--c) 60%,transparent);cursor:grab;z-index:1;touch-action:pan-y;overflow:hidden}
+.bar:active{cursor:grabbing}
+.bar .fill{position:absolute;inset-block:0;right:0;background:var(--c)}
+.bar .h{position:absolute;left:0;top:0;bottom:0;width:8px;cursor:ew-resize;touch-action:none}
+.bar .h::after{content:"";position:absolute;left:2px;top:4px;bottom:4px;width:2px;border-radius:1px;background:color-mix(in srgb,var(--c) 70%,var(--ink))}
+.bar.late{outline:2px dashed var(--bad);outline-offset:1px}
+.bar.ms{width:16px!important;height:16px;top:9px;border-radius:2px;transform:rotate(45deg);background:var(--c);border-color:var(--c);overflow:visible;margin-right:-8px}
+.sbar{position:absolute;top:13px;height:8px;background:color-mix(in srgb,var(--c) 45%,transparent);border-radius:2px;z-index:1}
+.sbar i{position:absolute;inset-block:0;right:0;background:var(--c);border-radius:2px}
+.bl{position:absolute;top:9px;font-size:11px;color:var(--muted);white-space:nowrap;z-index:1;pointer-events:none;font-variant-numeric:tabular-nums}
+.addrow .side{color:var(--muted)}
+.tip{position:fixed;z-index:50;pointer-events:none;background:var(--ink);color:var(--bg);font-size:12px;padding:4px 8px;border-radius:4px;white-space:nowrap}
+@media (max-width:700px){
+  :root{--side:186px}
+  .side{grid-template-columns:34px minmax(0,1fr) 40px}
+  .side .c-s,.side .c-d{display:none}
+}
+
+/* plan */
+.plan{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
+@media (max-width:900px){.plan{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.card.wide{grid-column:1/-1}
+.card h2{font-size:17px}
+.card .lead{margin:0;color:var(--muted);font-size:13px}
+.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px 14px}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);min-width:0}
+.in,label.f input,label.f select,label.f textarea{width:100%;border:1px solid var(--line);border-radius:6px;background:var(--surface);padding:6px 9px;font-size:14px;color:var(--ink)}
+textarea.in{resize:vertical;min-height:84px;line-height:1.7}
+.ro{font-size:14px;color:var(--ink);padding-block:6px;font-variant-numeric:tabular-nums}
+.phases{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:0}
+.phases li{display:grid;grid-template-columns:28px minmax(0,1fr);gap:4px 10px;padding-block:12px;border-top:1px solid var(--line-soft)}
+.phases li:first-child{border-top:0}
+.phases .n{width:26px;height:26px;border-radius:6px;background:var(--c);color:#fff;display:grid;place-items:center;font-weight:700;font-size:13px;font-family:var(--font-display)}
+.phases .hd{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline}
+.phases .hd h3{font-size:15px}
+.phases .meta{font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.phases .body{grid-column:2;display:flex;flex-direction:column;gap:6px}
+.phases textarea.in{min-height:52px;font-size:13px}
+.mini{height:6px;border-radius:3px;background:var(--surface-2);overflow:hidden;position:relative}
+.mini i{position:absolute;inset-block:0;right:0;background:var(--c)}
+.tw{overflow-x:auto}
+table.t{width:100%;border-collapse:collapse;font-size:13px}
+table.t th{text-align:right;font-size:12px;color:var(--muted);font-weight:600;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+table.t td{padding:6px 8px;border-bottom:1px solid var(--line-soft);vertical-align:top}
+table.t td.num{white-space:nowrap}
+table.t .in{padding:4px 7px;font-size:13px}
+table.t textarea.in{min-height:38px}
+.risk{min-width:760px}
+
+/* dialog */
+dialog{border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);padding:0;width:min(620px,calc(100vw - 32px));max-height:calc(100vh - 32px)}
+dialog::backdrop{background:rgba(8,20,26,.45)}
+dialog form{display:flex;flex-direction:column;gap:12px;padding:18px}
+dialog header{display:flex;align-items:center;justify-content:space-between;gap:10px}
+dialog h2{font-size:18px}
+.x{border:0;background:none;font-size:22px;line-height:1;cursor:pointer;color:var(--muted);padding:4px 8px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px} .g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+@media (max-width:520px){.g2,.g3{grid-template-columns:1fr}}
+.chk{display:flex;align-items:center;gap:8px;font-size:13px}
+.preds{max-height:160px;overflow:auto;border:1px solid var(--line);border-radius:6px;padding:6px 10px;display:flex;flex-direction:column;gap:2px}
+.preds label{display:flex;gap:8px;align-items:center;font-size:13px}
+.preds .w{color:var(--muted);font-size:11.5px;font-variant-numeric:tabular-nums}
+fieldset{border:0;padding:0;margin:0;display:flex;flex-direction:column;gap:4px}
+legend{font-size:12px;color:var(--muted);padding:0;margin-bottom:4px}
+dialog footer{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+dialog footer .grow{flex:1}
+.note{font-size:12px;color:var(--warn)}
+.toast{position:fixed;bottom:calc(18px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:6px;font-size:13px;z-index:60;max-width:calc(100vw - 32px)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style><div id="app"></div><script type="application/json" id="plan-data">{"rev":0,"meta":{"name":"مشروع محطات رفع حفر الباطن","client":"","contractor":"","consultant":"","location":"محافظة حفر الباطن – المنطقة الشرقية","start":"2026-11-01","stations":["م.ر 1","م.ر 2","م.ر 3"],"scope":"تنفيذ وتشغيل محطات رفع الصرف الصحي في حفر الباطن، ويشمل: الأعمال المدنية للآبار الرطبة وغرف المحابس ومباني الكهرباء والتحكم، وتوريد وتركيب المضخات الغاطسة والمعدات الميكانيكية والكهربائية والمولدات الاحتياطية، وتمديد خطوط الطرد واختبارها، وأنظمة التحكم والمراقبة SCADA وربطها بمركز التحكم، ثم الاختبار والتشغيل التجريبي والتسليم الابتدائي.","governance":"اجتماع تنسيقي أسبوعي مع الاستشاري لمتابعة الإنجاز والاعتمادات.\nتقرير إنجاز شهري للجهة المالكة يتضمن نسبة الإنجاز المخطط والفعلي والصور والمخاطر.\nتحديث الجدول الزمني كل أسبوعين وقياس الانحراف واتخاذ الإجراءات التصحيحية.\nمتابعة أسبوعية لحالة توريد البنود طويلة الأجل.","updated":""},"phases":[{"id":"p1","name":"التجهيز والاعتمادات","desc":"استلام المواقع، التعبئة، خطط الجودة والسلامة، الرفع المساحي وفحص التربة."},{"id":"p2","name":"التصميم والمخططات التنفيذية","desc":"التصميم التفصيلي، المخططات التنفيذية، اعتماد المواد والمعدات من الاستشاري."},{"id":"p3","name":"التوريد","desc":"البنود طويلة الأجل: المضخات الغاطسة، لوحات التحكم، المولدات، المواسير والمحابس، أنظمة SCADA."},{"id":"p4","name":"الأعمال المدنية","desc":"الحفر ونزح المياه الجوفية وسند الجوانب، خرسانة البئر الرطب، غرفة المحابس ومبنى التحكم، الأعمال الخارجية."},{"id":"p5","name":"الأعمال الميكانيكية وخطوط الطرد","desc":"تركيب المضخات ومجاري التوجيه والمواسير والمحابس، تمديد خطوط الطرد والاختبار الهيدروستاتيكي."},{"id":"p6","name":"الأعمال الكهربائية والتحكم","desc":"التغذية الكهربائية، لوحات MCC والمولدات، الكابلات، أنظمة SCADA والربط بمركز التحكم."},{"id":"p7","name":"الاختبار والتشغيل","desc":"الاختبارات الموقعية SAT لكل محطة، ثم التشغيل التجريبي للمنظومة كاملة."},{"id":"p8","name":"التسليم","desc":"المخططات النهائية، أدلة التشغيل والصيانة، تدريب الكوادر، الاستلام الابتدائي."}],"tasks":[{"id":"t1","phase":"p1","name":"توقيع العقد وأمر المباشرة","station":"عام","dur":0,"ms":true,"preds":[],"progress":0,"owner":"إدارة المشروع","notes":""},{"id":"t2","phase":"p1","name":"استلام المواقع من الجهة المالكة","station":"عام","dur":14,"preds":["t1"],"progress":0,"owner":"إدارة المشروع","notes":""},{"id":"t3","phase":"p1","name":"التعبئة وتجهيز المكاتب والمرافق المؤقتة","station":"عام","dur":30,"preds":["t2"],"progress":0,"owner":"إدارة المشروع","notes":""},{"id":"t4","phase":"p1","name":"إعداد واعتماد خطة الجودة وخطة السلامة (HSE)","station":"عام","dur":21,"preds":["t1"],"progress":0,"owner":"الجودة والسلامة","notes":""},{"id":"t5","phase":"p1","name":"الرفع المساحي وتحديد مسارات خطوط الطرد","station":"عام","dur":21,"preds":["t2"],"progress":0,"owner":"المكتب الفني","notes":""},{"id":"t6","phase":"p1","name":"الجسات وفحص التربة ومنسوب المياه الجوفية","station":"عام","dur":28,"preds":["t2"],"progress":0,"owner":"المكتب الفني","notes":""},{"id":"t7","phase":"p2","name":"التصميم التفصيلي (مدني، ميكانيكي، كهربائي)","station":"عام","dur":60,"preds":["t5","t6"],"progress":0,"owner":"المكتب الفني","notes":""},{"id":"t8","phase":"p2","name":"المخططات التنفيذية (Shop Drawings)","station":"عام","dur":30,"preds":["t7"],"progress":0,"owner":"المكتب الفني","notes":""},{"id":"t9","phase":"p2","name":"تقديم واعتماد المواد والمعدات (Submittals)","station":"عام","dur":45,"preds":["t4"],"progress":0,"owner":"المكتب الفني","notes":""},{"id":"t10","phase":"p2","name":"اعتماد التصميم والمخططات من الاستشاري","station":"عام","dur":0,"ms":true,"preds":["t8"],"progress":0,"owner":"المكتب الفني","notes":""},{"id":"t11","phase":"p3","name":"توريد المضخات الغاطسة ومجاري التوجيه","station":"عام","dur":120,"preds":["t9"],"progress":0,"owner":"المشتريات","notes":"بند طويل الأجل"},{"id":"t12","phase":"p3","name":"توريد المواسير والمحابس وقطع الربط","station":"عام","dur":90,"preds":["t9"],"progress":0,"owner":"المشتريات","notes":""},{"id":"t13","phase":"p3","name":"توريد لوحات MCC والمولدات الاحتياطية","station":"عام","dur":120,"preds":["t9"],"progress":0,"owner":"المشتريات","notes":"بند طويل الأجل"},{"id":"t14","phase":"p3","name":"توريد أنظمة SCADA/RTU وأجهزة القياس","station":"عام","dur":100,"preds":["t9"],"progress":0,"owner":"المشتريات","notes":""},{"id":"c1a","phase":"p4","name":"الحفر ونزح المياه الجوفية وسند الجوانب","station":"م.ر 1","dur":45,"preds":["t10","t3"],"progress":0,"owner":"فريق الأعمال المدنية","notes":""},{"id":"c1b","phase":"p4","name":"خرسانة البئر الرطب","station":"م.ر 1","dur":75,"preds":["c1a"],"progress":0,"owner":"فريق الأعمال المدنية","notes":""},{"id":"c1c","phase":"p4","name":"غرفة المحابس ومبنى الكهرباء والتحكم","station":"م.ر 1","dur":60,"preds":["c1b"],"progress":0,"owner":"فريق الأعمال المدنية","notes":""},{"id":"c1d","phase":"p4","name":"الأسوار والطرق والأعمال الخارجية","station":"م.ر 1","dur":30,"preds":["c1c"],"progress":0,"owner":"فريق الأعمال المدنية","notes":""},{"id":"c2a","phase":"p4","name":"الحفر ونزح المياه الجوفية وسند الجوانب","station":"م.ر 2","dur":45,"preds":["c1a"],"progress":0,"owner":"فريق الأعمال المدنية","notes":""},{"id":"c2b","phase":"p4","name":"خرسانة البئر الرطب","station":"م.ر 2","dur":75,"preds":["c2a"],"progress":0,"owner":"فريق الأعمال المدنية","notes":""},{"id":"c2c","phase":"p4","name":"غرفة المحابس ومبنى الكهرباء والتحكم","station":"م.ر 2","dur":60,"preds":["c2b"],"progress":0,"owner":"فريق الأعمال المدنية","notes":""},{"id":"c2d","phase":"p4","name":"الأسوار والطرق والأعمال الخارجية","station":"م.ر 2","dur":30,"preds":["c2c"],"progress":0,"owner":"فريق الأعمال المدنية","notes":""},{"id":"c3a","phase":"p4","name":"الحفر ونزح المياه الجوفية وسند الجوانب","station":"م.ر 3","dur":45,"preds":["c2a"],"progress":0,"owner":"فريق الأعمال المدنية","notes":""},{"id":"c3b","phase":"p4","name":"خرسانة البئر الرطب","station":"م.ر 3","dur":75,"preds":["c3a"],"progress":0,"owner":"فريق الأعمال المدنية","notes":""},{"id":"c3c","phase":"p4","name":"غرفة المحابس ومبنى الكهرباء والتحكم","station":"م.ر 3","dur":60,"preds":["c3b"],"progress":0,"owner":"فريق الأعمال المدنية","notes":""},{"id":"c3d","phase":"p4","name":"الأسوار والطرق والأعمال الخارجية","station":"م.ر 3","dur":30,"preds":["c3c"],"progress":0,"owner":"فريق الأعمال المدنية","notes":""},{"id":"m1","phase":"p5","name":"تركيب المضخات ومجاري التوجيه والمواسير والمحابس","station":"م.ر 1","dur":30,"preds":["c1b","t11","t12"],"progress":0,"owner":"فريق الميكانيكا","notes":""},{"id":"m2","phase":"p5","name":"تركيب المضخات ومجاري التوجيه والمواسير والمحابس","station":"م.ر 2","dur":30,"preds":["c2b","t11","t12"],"progress":0,"owner":"فريق الميكانيكا","notes":""},{"id":"m3","phase":"p5","name":"تركيب المضخات ومجاري التوجيه والمواسير والمحابس","station":"م.ر 3","dur":30,"preds":["c3b","t11","t12"],"progress":0,"owner":"فريق الميكانيكا","notes":""},{"id":"mL","phase":"p5","name":"تمديد خطوط الطرد","station":"عام","dur":150,"preds":["t10","t12"],"progress":0,"owner":"فريق الميكانيكا","notes":""},{"id":"mH","phase":"p5","name":"الاختبار الهيدروستاتيكي لخطوط الطرد","station":"عام","dur":21,"preds":["mL"],"progress":0,"owner":"الجودة والسلامة","notes":""},{"id":"e0","phase":"p6","name":"التنسيق مع شركة الكهرباء وإيصال التغذية","station":"عام","dur":150,"preds":["t7"],"progress":0,"owner":"فريق الكهرباء","notes":""},{"id":"e1","phase":"p6","name":"تركيب لوحات MCC والمولد والكابلات","station":"م.ر 1","dur":35,"preds":["c1c","t13"],"progress":0,"owner":"فريق الكهرباء","notes":""},{"id":"e2","phase":"p6","name":"تركيب لوحات MCC والمولد والكابلات","station":"م.ر 2","dur":35,"preds":["c2c","t13"],"progress":0,"owner":"فريق الكهرباء","notes":""},{"id":"e3","phase":"p6","name":"تركيب لوحات MCC والمولد والكابلات","station":"م.ر 3","dur":35,"preds":["c3c","t13"],"progress":0,"owner":"فريق الكهرباء","notes":""},{"id":"eS","phase":"p6","name":"ربط أنظمة SCADA بمركز التحكم","station":"عام","dur":30,"preds":["e1","e2","e3","t14"],"progress":0,"owner":"فريق الكهرباء","notes":""},{"id":"x1","phase":"p7","name":"الاختبارات الموقعية والتشغيل المبدئي (SAT)","station":"م.ر 1","dur":21,"preds":["m1","e1","e0"],"progress":0,"owner":"فريق التشغيل","notes":""},{"id":"x2","phase":"p7","name":"الاختبارات الموقعية والتشغيل المبدئي (SAT)","station":"م.ر 2","dur":21,"preds":["m2","e2","e0"],"progress":0,"owner":"فريق التشغيل","notes":""},{"id":"x3","phase":"p7","name":"الاختبارات الموقعية والتشغيل المبدئي (SAT)","station":"م.ر 3","dur":21,"preds":["m3","e3","e0"],"progress":0,"owner":"فريق التشغيل","notes":""},{"id":"xT","phase":"p7","name":"التشغيل التجريبي للمنظومة كاملة","station":"عام","dur":30,"preds":["x1","x2","x3","eS","mH"],"progress":0,"owner":"فريق التشغيل","notes":""},{"id":"h1","phase":"p8","name":"المخططات النهائية (As-Built)","station":"عام","dur":30,"preds":["x3"],"progress":0,"owner":"المكتب الفني","notes":""},{"id":"h2","phase":"p8","name":"أدلة التشغيل والصيانة وتدريب الكوادر","station":"عام","dur":21,"preds":["x3"],"progress":0,"owner":"فريق التشغيل","notes":""},{"id":"h3","phase":"p8","name":"الاستلام الابتدائي","station":"عام","dur":0,"ms":true,"preds":["xT","h1","h2"],"progress":0,"owner":"إدارة المشروع","notes":""}],"risks":[{"id":"r1","risk":"ارتفاع منسوب المياه الجوفية أثناء حفر الآبار الرطبة","prob":"عالية","impact":"عالي","mitigation":"نزح مستمر بنظام Well-point، سند جوانب الحفر، ومتابعة يومية للمنسوب"},{"id":"r2","risk":"تأخر توريد المضخات ولوحات التحكم والمولدات","prob":"متوسطة","impact":"عالي","mitigation":"طلب مبكر للبنود طويلة الأجل فور اعتماد المواد، ومتابعة أسبوعية مع الموردين"},{"id":"r3","risk":"تأخر إيصال التغذية الكهربائية الدائمة","prob":"متوسطة","impact":"عالي","mitigation":"بدء التنسيق مع شركة الكهرباء من مرحلة التصميم، واستخدام مولد مؤقت للاختبارات"},{"id":"r4","risk":"تعارض مسار خطوط الطرد مع خدمات قائمة","prob":"متوسطة","impact":"متوسط","mitigation":"كشف الخدمات بالحفر اليدوي وأجهزة الكشف قبل الحفر، والتنسيق مع الجهات المعنية"},{"id":"r5","risk":"ارتفاع درجات الحرارة صيفاً وأثرها على صب الخرسانة","prob":"عالية","impact":"متوسط","mitigation":"الصب ليلاً أو فجراً، تبريد الخلطة، ومعالجة مستمرة للخرسانة"},{"id":"r6","risk":"تأخر اعتمادات الاستشاري للمخططات والمواد","prob":"متوسطة","impact":"متوسط","mitigation":"جدول تقديمات معتمد واجتماعات مراجعة أسبوعية"}]}</script><script id="app-js">
+(function(){
+'use strict';
+var DAY=864e5;
+var $=function(s,r){return (r||document).querySelector(s)};
+var $$=function(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s))};
+var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
+var dnum=function(iso){return Math.round(Date.parse(iso+'T00:00:00Z')/DAY)};
+var diso=function(n){return new Date(n*DAY).toISOString().slice(0,10)};
+var LOC='ar-u-nu-latn-ca-gregory';
+var fD=new Intl.DateTimeFormat(LOC,{day:'numeric',month:'long',year:'numeric',timeZone:'UTC'});
+var fM=new Intl.DateTimeFormat(LOC,{month:'long',timeZone:'UTC'});
+var fMY=new Intl.DateTimeFormat(LOC,{month:'long',year:'numeric',timeZone:'UTC'});
+var fd=function(n){return fD.format(new Date(n*DAY))};
+var fShort=function(n){var d=new Date(n*DAY);return String(d.getUTCDate()).padStart(2,'0')+'/'+String(d.getUTCMonth()+1).padStart(2,'0')+'/'+String(d.getUTCFullYear()).slice(2)};
+var TODAY=Math.floor(Date.now()/DAY);
+var DRAFT_KEY='hafr-lifting-plan-draft-v1', UI_KEY='hafr-lifting-plan-ui-v1';
+var TITLE='محطات رفع حفر الباطن';
+var ZOOM={day:{ppd:26,label:'يوم'},week:{ppd:6,label:'أسبوع'},month:{ppd:2.2,label:'شهر'},quarter:{ppd:1,label:'ربع سنة'}};
+var LEVELS=['منخفضة','متوسطة','عالية'], IMPACTS=['منخفض','متوسط','عالي'];
+
+function ls(fn){try{return fn()}catch(e){return null}}
+var pageState=JSON.parse($('#plan-data').textContent);
+var baseRev=pageState.rev||0;
+var state=JSON.parse(JSON.stringify(pageState));
+var ui={tab:'gantt',zoom:'week',station:'all',collapsed:{},hideNote:false};
+var savedUi=ls(function(){return JSON.parse(localStorage.getItem(UI_KEY)||'null')});
+if(savedUi) Object.assign(ui,savedUi);
+var dirty=false, saving=false, hist=[], fut=[], art=null, dl=null, artKnown=false, readOnly=false;
+var draftBanner=null;
+var draft=ls(function(){return JSON.parse(localStorage.getItem(DRAFT_KEY)||'null')});
+if(draft&&draft.state){
+  if(draft.rev===baseRev){state=draft.state;dirty=true;draftBanner='restored'}
+  else draftBanner='older';
+}
+
+function saveUi(){ls(function(){localStorage.setItem(UI_KEY,JSON.stringify(ui))})}
+function saveDraft(){ls(function(){localStorage.setItem(DRAFT_KEY,JSON.stringify({rev:baseRev,at:Date.now(),state:state}))})}
+function clearDraft(){ls(function(){localStorage.removeItem(DRAFT_KEY)})}
+
+/* ---------- model ---------- */
+function T(){return state.tasks}
+function byId(){var m={};T().forEach(function(t){m[t.id]=t});return m}
+function sDay(t){return dnum(t.start)}
+function fin(t){return sDay(t)+(t.ms?0:Math.max(1,t.dur))}
+function endDay(t){return t.ms?sDay(t):fin(t)-1}
+function planned(t){var s=sDay(t);if(t.ms)return TODAY>=s?1:0;return Math.min(1,Math.max(0,(TODAY-s)/Math.max(1,t.dur)))}
+function status(t){
+  var p=t.progress||0;
+  if(p>=100)return 'done';
+  if(TODAY>=fin(t)||planned(t)*100-p>15)return TODAY>=sDay(t)?'late':'planned';
+  if(p>0||TODAY>=sDay(t))return 'active';
+  return 'planned';
+}
+var STLBL={done:'مكتملة',late:'متأخرة',active:'جارية',planned:'لم تبدأ'};
+function schedule(){
+  var m=byId(),ts=T();
+  ts.forEach(function(t){if(!t.start)t.start=state.meta.start; if(!t.preds)t.preds=[];});
+  for(var pass=0;pass<=ts.length;pass++){
+    var ch=false;
+    ts.forEach(function(t){
+      var mn=null;
+      t.preds.forEach(function(p){var q=m[p];if(q&&q!==t){var f=fin(q);if(mn===null||f>mn)mn=f}});
+      if(mn!==null&&sDay(t)<mn){t.start=diso(mn);ch=true}
+    });
+    if(!ch)break;
+  }
+}
+function descendants(id){
+  var out={},stack=[id];
+  while(stack.length){var c=stack.pop();T().forEach(function(t){if(t.preds.indexOf(c)>=0&&!out[t.id]){out[t.id]=1;stack.push(t.id)}})}
+  return out;
+}
+function stats(list){
+  list=list||T();
+  var w=0,a=0,p=0,s=Infinity,e=-Infinity;
+  list.forEach(function(t){var d=t.ms?0:Math.max(1,t.dur);w+=d;a+=d*(t.progress||0)/100;p+=d*planned(t);s=Math.min(s,sDay(t));e=Math.max(e,endDay(t))});
+  return {actual:w?a/w*100:0,planned:w?p/w*100:0,start:s,end:e};
+}
+function phaseColor(i){return 'var(--c'+((i%8)+1)+')'}
+function phaseIndex(id){for(var i=0;i<state.phases.length;i++)if(state.phases[i].id===id)return i;return 0}
+function stationOk(t){return ui.station==='all'||t.station===ui.station}
+function uid(p){return p+Math.random().toString(36).slice(2,8)}
+function wbsMap(){var m={};state.phases.forEach(function(ph,pi){var k=0;T().forEach(function(t){if(t.phase===ph.id){k++;m[t.id]=(pi+1)+'.'+k}})});return m}
+
+/* ---------- history & mutation ---------- */
+function snap(){hist.push(JSON.stringify(state));if(hist.length>80)hist.shift();fut=[]}
+function changed(){dirty=true;saveDraft();renderAll()}
+function mutate(fn){snap();fn();schedule();changed()}
+function undo(){if(!hist.length)return;fut.push(JSON.stringify(state));state=JSON.parse(hist.pop());changed();toast('تم التراجع')}
+function redo(){if(!fut.length)return;hist.push(JSON.stringify(state));state=JSON.parse(fut.pop());changed()}
+
+/* ---------- toast ---------- */
+var toastT;
+function toast(msg){var el=$('#toast');if(!el){el=document.createElement('div');el.id='toast';el.className='toast';el.setAttribute('role','status');document.body.appendChild(el)}el.textContent=msg;el.hidden=false;clearTimeout(toastT);toastT=setTimeout(function(){el.hidden=true},3200)}
+
+/* ---------- shell ---------- */
+var app=$('#app');
+app.innerHTML=
+ '<header class="top"><div class="brand"><div class="eyebrow">خطة عمل وجدول زمني</div><h1 id="h-name"></h1><div class="sub" id="h-sub"></div></div>'+
+ '<div class="savebox"><span class="chip" id="save-chip"></span><button class="btn primary" id="btn-save" type="button">حفظ التعديلات للجميع</button></div></header>'+
+ '<div id="banners"></div>'+
+ '<section class="kpis" id="kpis" aria-label="ملخص المشروع"></section>'+
+ '<nav class="tabs" role="tablist"><button role="tab" id="tab-gantt" data-tab="gantt">الجدول الزمني</button><button role="tab" id="tab-plan" data-tab="plan">خطة العمل</button></nav>'+
+ '<section id="panel-gantt" role="tabpanel" style="display:flex;flex-direction:column;gap:10px">'+
+  '<div class="toolbar"><div class="seg" id="zoom" aria-label="مقياس العرض"></div>'+
+  '<select class="btn" id="station-filter" aria-label="تصفية حسب الموقع"></select>'+
+  '<button class="btn" id="btn-today" type="button">الانتقال لليوم</button><span class="grow"></span>'+
+  '<button class="btn" id="btn-undo" type="button" title="Ctrl+Z">تراجع</button><button class="btn" id="btn-redo" type="button">إعادة</button>'+
+  '<button class="btn" id="btn-add-phase" type="button">+ مرحلة</button><button class="btn primary" id="btn-add-task" type="button">+ مهمة</button>'+
+  '<button class="btn" id="btn-export" type="button" hidden>تصدير CSV (Excel)</button></div>'+
+  '<div class="legend" id="legend"></div>'+
+  '<div class="gantt" id="gantt"></div>'+
+  '<p class="hint">اسحب الشريط لتغيير تاريخ البداية، واسحب طرفه الأيسر لتغيير المدة، أو انقر على اسم المهمة لتعديل كل التفاصيل. المهام التابعة تُرحَّل تلقائياً عند تأخر ما قبلها. المدد بالأيام التقويمية.</p>'+
+ '</section>'+
+ '<section id="panel-plan" role="tabpanel"></section>'+
+ '<dialog id="dlg"></dialog>';
+
+var gEl=$('#gantt'), dlg=$('#dlg');
+
+/* ---------- render: header, banners, kpis ---------- */
+function renderHeader(){
+  var m=state.meta;
+  $('#h-name').textContent=m.name||'مشروع محطات الرفع';
+  var parts=[m.location,m.client&&('الجهة المالكة: '+m.client),m.contractor&&('المقاول: '+m.contractor)].filter(Boolean);
+  $('#h-sub').textContent=parts.join(' · ');
+}
+function renderBanners(){
+  var h='';
+  if(draftBanner==='restored') h+='<div class="banner"><p>استعدنا تعديلاتك غير المحفوظة من جلستك السابقة على هذا المتصفح.</p><button class="btn sm" data-act="discard-draft" type="button">تجاهل التعديلات</button></div>';
+  if(draftBanner==='older') h+='<div class="banner warn"><p>لديك تعديلات محلية على نسخة أقدم من الخطة. استعادتها تستبدل النسخة الحالية.</p><button class="btn sm" data-act="restore-old" type="button">استعادة تعديلاتي</button><button class="btn sm" data-act="drop-old" type="button">حذفها</button></div>';
+  if(!ui.hideNote) h+='<div class="banner"><p>الخطة معبأة بأنشطة ومدد نموذجية لمشروع محطات رفع صرف صحي (3 محطات) تبدأ في '+esc(fd(dnum(state.meta.start)))+'. عدّل الأسماء والمدد وتاريخ البدء وعدد المحطات لتطابق العقد.</p><button class="btn sm" data-act="hide-note" type="button">فهمت</button></div>';
+  $('#banners').innerHTML=h;
+}
+function renderKpis(){
+  var s=stats(), n=T().length, c={done:0,late:0,active:0,planned:0};
+  T().forEach(function(t){c[status(t)]++});
+  var days=s.end-s.start+1, dev=s.actual-s.planned;
+  var pill=s.planned===0&&s.actual===0?'<span class="pill n">لم يبدأ التنفيذ</span>':dev<-5?'<span class="pill bad">متأخر '+Math.abs(dev).toFixed(1)+'٪</span>':dev>2?'<span class="pill ok">متقدم '+dev.toFixed(1)+'٪</span>':'<span class="pill ok">ضمن الخطة</span>';
+  var toEnd=s.end-TODAY;
+  $('#kpis').innerHTML=
+   '<div class="kpi"><span class="k">مدة التنفيذ</span><span class="v">'+days+'<small>يوم · '+(days/30.44).toFixed(1)+' شهر</small></span><span class="s num">من '+esc(fd(s.start))+' إلى '+esc(fd(s.end))+'</span></div>'+
+   '<div class="kpi"><span class="k">الإنجاز الفعلي مقابل المخطط</span><span class="v">'+s.actual.toFixed(1)+'٪<small>المخطط '+s.planned.toFixed(1)+'٪</small></span><div class="dual" title="المخطط حتى اليوم"><i class="pl" style="width:'+s.planned+'%"></i><i class="ac" style="width:'+s.actual+'%"></i></div><span class="s">'+pill+'</span></div>'+
+   '<div class="kpi"><span class="k">المهام</span><span class="v">'+c.done+'<small>مكتملة من '+n+'</small></span><span class="s">'+c.active+' جارية · <b style="color:var(--bad)">'+c.late+' متأخرة</b> · '+c.planned+' لم تبدأ</span></div>'+
+   '<div class="kpi"><span class="k">الاستلام الابتدائي المتوقع</span><span class="v" style="font-size:19px">'+esc(fd(s.end))+'</span><span class="s">'+(toEnd>=0?'بعد '+toEnd+' يوماً من اليوم':'انتهى قبل '+(-toEnd)+' يوماً')+'</span></div>';
+}
+function renderSave(){
+  var chip=$('#save-chip'),b=$('#btn-save');
+  b.hidden=readOnly||(artKnown&&!art);
+  b.disabled=!dirty||saving||!art;
+  b.textContent=saving?'جارٍ الحفظ…':'حفظ التعديلات للجميع';
+  if(saving){chip.className='chip';chip.textContent='جارٍ الحفظ…'}
+  else if(!artKnown){chip.className='chip';chip.textContent=dirty?'تعديلات غير محفوظة':'محفوظ'}
+  else if(readOnly||!art){chip.className='chip warn';chip.textContent='عرض فقط · تعديلاتك محفوظة في هذا المتصفح'}
+  else if(dirty){chip.className='chip warn';chip.textContent='تعديلات غير محفوظة'}
+  else{chip.className='chip ok';chip.textContent=state.meta.updated?'محفوظ · آخر تحديث '+fShort(Math.floor(Date.parse(state.meta.updated)/DAY)):'محفوظ'}
+  $('#btn-undo').disabled=!hist.length;$('#btn-redo').disabled=!fut.length;
+}
+function renderTabs(){
+  $$('.tabs button').forEach(function(b){b.setAttribute('aria-selected',b.dataset.tab===ui.tab?'true':'false')});
+  $('#panel-gantt').hidden=ui.tab!=='gantt';$('#panel-plan').hidden=ui.tab!=='plan';
+}
+
+/* ---------- gantt ---------- */
+var G={d0:0,d1:0,ppd:6};
+function monthStart(n,off){var d=new Date(n*DAY);return Date.UTC(d.getUTCFullYear(),d.getUTCMonth()+(off||0),1)/DAY}
+function units(kind,a,b){
+  var out=[],cur,step;
+  if(kind==='day'){for(cur=a;cur<b;cur++)out.push({s:cur,e:cur+1,l:String(new Date(cur*DAY).getUTCDate())});return out}
+  if(kind==='week'){cur=a;while(new Date(cur*DAY).getUTCDay()!==0)cur++;if(cur>a)out.push({s:a,e:cur,l:''});for(;cur<b;cur+=7)out.push({s:cur,e:Math.min(b,cur+7),l:String(new Date(cur*DAY).getUTCDate())});return out}
+  step=kind==='month'?1:kind==='quarter'?3:12;
+  var d=new Date(a*DAY),y=d.getUTCFullYear(),m=d.getUTCMonth();
+  if(kind==='quarter')m=m-m%3; if(kind==='year')m=0;
+  while(true){
+    var s=Date.UTC(y,m,1)/DAY;if(s>=b)break;var e=Date.UTC(y,m+step,1)/DAY;
+    var l=kind==='month'?fM.format(new Date(s*DAY)):kind==='quarter'?'الربع '+(Math.floor(m/3)+1):String(y);
+    if(kind==='month'&&G.ppd*30>120)l=fMY.format(new Date(s*DAY));
+    out.push({s:Math.max(s,a),e:Math.min(e,b),l:l});
+    m+=step;while(m>11){m-=12;y++}
+  }
+  return out;
+}
+function renderGantt(){
+  var keepL=gEl.scrollLeft,keepT=gEl.scrollTop;
+  var z=ZOOM[ui.zoom]||ZOOM.week;G.ppd=z.ppd;
+  var a=Infinity,b=-Infinity;T().forEach(function(t){a=Math.min(a,sDay(t));b=Math.max(b,fin(t))});
+  if(!isFinite(a)){a=dnum(state.meta.start);b=a+90}
+  G.d0=monthStart(a-7);G.d1=monthStart(b+14,1);
+  var ppd=G.ppd,W=Math.round((G.d1-G.d0)*ppd);
+  var x=function(d){return ((d-G.d0)*ppd).toFixed(1)};
+  var tiers=ui.zoom==='day'?['month','day']:ui.zoom==='week'?['month','week']:ui.zoom==='month'?['year','month']:['year','quarter'];
+  var top=units(tiers[0],G.d0,G.d1),bot=units(tiers[1],G.d0,G.d1);
+  var uh=function(list){return list.map(function(u){var l=tiers[0]==='month'&&list===top?fMY.format(new Date(u.s*DAY)):u.l;return '<div class="u" style="right:'+x(u.s)+'px;width:'+((u.e-u.s)*ppd).toFixed(1)+'px">'+esc(l)+'</div>'}).join('')};
+  var ov='';
+  if(ui.zoom==='day'){for(var d=G.d0;d<G.d1;d++){var wd=new Date(d*DAY).getUTCDay();if(wd===5||wd===6)ov+='<div class="we" style="right:'+x(d)+'px;width:'+ppd+'px"></div>'}}
+  bot.forEach(function(u){ov+='<div class="vl" style="right:'+x(u.s)+'px"></div>'});
+  top.forEach(function(u){ov+='<div class="vl strong" style="right:'+x(u.s)+'px"></div>'});
+  if(TODAY>=G.d0&&TODAY<=G.d1)ov+='<div class="today" style="right:'+x(TODAY)+'px"><span>اليوم</span></div>';
+  var wb=wbsMap(),rows='';
+  state.phases.forEach(function(ph,pi){
+    var all=T().filter(function(t){return t.phase===ph.id}),vis=all.filter(stationOk);
+    if(ui.station!=='all'&&!vis.length)return;
+    var col=phaseColor(pi),coll=!!ui.collapsed[ph.id];
+    var st=vis.length?stats(vis):null;
+    rows+='<div class="r ph'+(coll?' collapsed':'')+'" style="--c:'+col+'"><div class="side"><span class="wbs">'+(pi+1)+'</span>'+
+      '<button class="nm" type="button" data-toggle="'+ph.id+'" aria-expanded="'+(!coll)+'"><span class="caret" aria-hidden="true">▾</span><span class="swatch"></span><span class="t">'+esc(ph.name)+'</span></button>'+
+      '<span class="c-s">'+(st?fShort(st.start):'')+'</span><span class="c-d">'+(st?(st.end-st.start+1)+' ي':'')+'</span><span class="c-p">'+(st?Math.round(st.actual)+'٪':'')+'</span></div>'+
+      '<div class="tc" style="width:'+W+'px">'+(st?'<div class="sbar" style="right:'+x(st.start)+'px;width:'+((st.end-st.start+1)*ppd).toFixed(1)+'px"><i style="width:'+st.actual+'%"></i></div><span class="bl" style="right:'+(parseFloat(x(st.end+1))+6)+'px"><button class="btn sm" type="button" data-phase-edit="'+ph.id+'" style="pointer-events:auto;padding:0 6px;font-size:11px">تعديل المرحلة</button></span>':'<span class="bl" style="right:8px"><button class="btn sm" type="button" data-phase-edit="'+ph.id+'" style="pointer-events:auto;padding:0 6px;font-size:11px">تعديل المرحلة</button></span>')+'</div></div>';
+    if(coll)return;
+    vis.forEach(function(t){
+      var s=sDay(t),stt=status(t),p=t.progress||0;
+      var tag=t.station&&t.station!=='عام'?'<span class="tag">'+esc(t.station)+'</span>':'';
+      rows+='<div class="r" style="--c:'+col+'"><div class="side"><span class="wbs">'+wb[t.id]+'</span>'+
+       '<button class="nm" type="button" data-edit="'+t.id+'" title="'+esc(t.name)+' · '+STLBL[stt]+'"><span class="dot '+stt+'"></span><span class="t">'+esc(t.name)+'</span>'+tag+'</button>'+
+       '<span class="c-s">'+fShort(s)+'</span><span class="c-d">'+(t.ms?'معلم':t.dur+' ي')+'</span><span class="c-p">'+p+'٪</span></div><div class="tc" style="width:'+W+'px">';
+      if(t.ms){rows+='<div class="bar ms'+(stt==='late'?' late':'')+'" data-id="'+t.id+'" style="right:'+x(s)+'px" title="'+esc(t.name)+'"></div><span class="bl" style="right:'+(parseFloat(x(s))+12)+'px">'+esc(t.name)+' · '+esc(fd(s))+'</span>'}
+      else{var w=Math.max(4,t.dur*ppd);rows+='<div class="bar'+(stt==='late'?' late':'')+'" data-id="'+t.id+'" style="right:'+x(s)+'px;width:'+w.toFixed(1)+'px" title="'+esc(t.name)+'"><div class="fill" style="width:'+p+'%"></div><i class="h" aria-hidden="true"></i></div><span class="bl" style="right:'+(parseFloat(x(s))+w+6).toFixed(1)+'px">'+p+'٪'+(ui.zoom!=='quarter'&&t.station&&t.station!=='عام'?' · '+esc(t.station):'')+'</span>'}
+      rows+='</div></div>';
+    });
+    rows+='<div class="r addrow"><div class="side"><span></span><button class="nm" type="button" data-add="'+ph.id+'" style="font-size:12px;color:var(--muted)">+ إضافة مهمة إلى «'+esc(ph.name)+'»</button></div><div class="tc" style="width:'+W+'px"></div></div>';
+  });
+  gEl.innerHTML='<div class="g" style="width:calc(var(--side) + '+W+'px)"><div class="g-head"><div class="side"><span>رقم</span><span>المهمة</span><span class="c-s">البداية</span><span class="c-d">المدة</span><span>الإنجاز</span></div>'+
+    '<div class="time-h" style="width:'+W+'px"><div class="tier t1">'+uh(top)+'</div><div class="tier t2">'+uh(bot)+'</div></div></div>'+
+    '<div class="g-body"><div class="overlay" style="width:'+W+'px">'+ov+'</div>'+rows+'</div></div>';
+  gEl.scrollLeft=keepL;gEl.scrollTop=keepT;
+  $('#zoom').innerHTML=Object.keys(ZOOM).map(function(k){return '<button type="button" data-zoom="'+k+'" aria-pressed="'+(ui.zoom===k)+'">'+ZOOM[k].label+'</button>'}).join('');
+  var opts=[['all','كل المواقع'],['عام','أعمال عامة']].concat(state.meta.stations.map(function(s){return [s,s]}));
+  $('#station-filter').innerHTML=opts.map(function(o){return '<option value="'+esc(o[0])+'"'+(ui.station===o[0]?' selected':'')+'>'+esc(o[1])+'</option>'}).join('');
+  $('#legend').innerHTML=state.phases.map(function(ph,i){return '<span style="--c:'+phaseColor(i)+'"><i></i>'+esc(ph.name)+'</span>'}).join('')+
+    '<span><i style="--c:var(--bad);background:none;outline:2px dashed var(--bad);outline-offset:-2px"></i>مهمة متأخرة</span><span><i style="--c:var(--bad);width:2px"></i>اليوم</span>';
+}
+function scrollToDay(d){
+  var side=parseFloat(getComputedStyle(gEl.querySelector('.g-head .side')).width)||0;
+  var off=side+(d-G.d0)*G.ppd-(gEl.clientWidth-side)/2-side;
+  gEl.scrollLeft=-Math.max(0,off);
+}
+
+/* drag bars */
+var drag=null,tipEl=null;
+function tip(txt,e){if(!tipEl){tipEl=document.createElement('div');tipEl.className='tip';document.body.appendChild(tipEl)}tipEl.hidden=!txt;tipEl.textContent=txt||'';if(e){tipEl.style.left=(e.clientX+12)+'px';tipEl.style.top=(e.clientY-30)+'px'}}
+gEl.addEventListener('pointerdown',function(e){
+  var bar=e.target.closest('.bar[data-id]');if(!bar||e.button>0)return;
+  var t=byId()[bar.dataset.id];if(!t)return;
+  drag={t:t,bar:bar,x0:e.clientX,s0:sDay(t),dur0:t.dur,resize:e.target.classList.contains('h'),moved:false,dd:0,pid:e.pointerId};
+  ls(function(){bar.setPointerCapture(e.pointerId)});
+});
+gEl.addEventListener('pointermove',function(e){
+  if(!drag)return;var dx=e.clientX-drag.x0;if(Math.abs(dx)>4)drag.moved=true;if(!drag.moved)return;
+  e.preventDefault();
+  var dd=Math.round(-dx/G.ppd);drag.dd=dd;
+  if(drag.resize){var nd=Math.max(1,drag.dur0+dd);drag.bar.style.width=(nd*G.ppd)+'px';tip(nd+' يوم · تنتهي '+fd(drag.s0+nd-1),e)}
+  else if(!drag.t.ms||true){var ns=drag.s0+dd;drag.bar.style.right=((ns-G.d0)*G.ppd)+'px';tip('تبدأ '+fd(ns),e)}
+});
+function endDrag(e,cancel){
+  if(!drag)return;var d=drag;drag=null;tip('');
+  if(cancel){renderGantt();return}
+  if(!d.moved){openTask(d.t.id);return}
+  if(!d.dd){renderGantt();return}
+  var before=d.s0+d.dd;
+  mutate(function(){var t=byId()[d.t.id];if(d.resize)t.dur=Math.max(1,d.dur0+d.dd);else t.start=diso(d.s0+d.dd)});
+  if(!d.resize&&sDay(byId()[d.t.id])>before)toast('قُيّدت البداية بانتهاء المهام السابقة لها');
+}
+gEl.addEventListener('pointerup',function(e){endDrag(e,false)});
+gEl.addEventListener('pointercancel',function(e){endDrag(e,true)});
+gEl.addEventListener('click',function(e){
+  var b;
+  if((b=e.target.closest('[data-toggle]'))){ui.collapsed[b.dataset.toggle]=!ui.collapsed[b.dataset.toggle];saveUi();renderGantt();return}
+  if((b=e.target.closest('[data-edit]'))){openTask(b.dataset.edit);return}
+  if((b=e.target.closest('[data-add]'))){newTask(b.dataset.add);return}
+  if((b=e.target.closest('[data-phase-edit]'))){openPhase(b.dataset.phaseEdit);return}
+});
+
+/* ---------- dialogs ---------- */
+function openDlg(){if(dlg.showModal){if(!dlg.open)dlg.showModal()}else dlg.setAttribute('open','')}
+function closeDlg(){if(dlg.close)dlg.close();else dlg.removeAttribute('open')}
+dlg.addEventListener('click',function(e){if(e.target===dlg||e.target.closest('[data-close]'))closeDlg()});
+function newTask(phaseId){
+  phaseId=phaseId||(state.phases[0]&&state.phases[0].id);
+  if(!phaseId){toast('أضف مرحلة أولاً');return}
+  var inPh=T().filter(function(t){return t.phase===phaseId});
+  var st=inPh.length?diso(Math.max.apply(null,inPh.map(fin))):state.meta.start;
+  openTask(null,{id:uid('t'),phase:phaseId,name:'',station:ui.station!=='all'?ui.station:'عام',start:st,dur:14,preds:[],progress:0,owner:'',notes:''});
+}
+function openTask(id,fresh){
+  var t=fresh||byId()[id];if(!t)return;
+  var isNew=!!fresh,desc=isNew?{}:descendants(t.id),wb=wbsMap();
+  var owners={};T().forEach(function(x){if(x.owner)owners[x.owner]=1});
+  var stations=['عام'].concat(state.meta.stations);if(stations.indexOf(t.station)<0)stations.push(t.station);
+  var s=dnum(t.start),endIso=diso(t.ms?s:s+Math.max(1,t.dur)-1);
+  var predList=T().filter(function(x){return x.id!==t.id&&!desc[x.id]}).map(function(x){
+    return '<label><input type="checkbox" value="'+x.id+'"'+(t.preds.indexOf(x.id)>=0?' checked':'')+'> <span class="w">'+wb[x.id]+'</span> '+esc(x.name)+(x.station&&x.station!=='عام'?' <span class="tag">'+esc(x.station)+'</span>':'')+'</label>'}).join('');
+  dlg.innerHTML='<form id="task-form"><header><h2>'+(isNew?'مهمة جديدة':'تعديل المهمة '+wb[t.id])+'</h2><button type="button" class="x" data-close aria-label="إغلاق">×</button></header>'+
+   '<label class="f">اسم المهمة<input id="f-name" required value="'+esc(t.name)+'" placeholder="مثال: صب سقف البئر الرطب"></label>'+
+   '<div class="g2"><label class="f">المرحلة<select id="f-phase">'+state.phases.map(function(p){return '<option value="'+p.id+'"'+(p.id===t.phase?' selected':'')+'>'+esc(p.name)+'</option>'}).join('')+'</select></label>'+
+   '<label class="f">الموقع<select id="f-station">'+stations.map(function(x){return '<option'+(x===t.station?' selected':'')+'>'+esc(x)+'</option>'}).join('')+'</select></label></div>'+
+   '<label class="chk"><input type="checkbox" id="f-ms"'+(t.ms?' checked':'')+'> معلم رئيسي (حدث بتاريخ واحد بدون مدة)</label>'+
+   '<div class="g3"><label class="f">تاريخ البداية<input type="date" id="f-start" value="'+t.start+'"></label><label class="f">المدة (يوم تقويمي)<input type="number" id="f-dur" min="1" value="'+Math.max(1,t.dur||1)+'"></label><label class="f">تاريخ النهاية<input type="date" id="f-end" value="'+endIso+'"></label></div>'+
+   '<label class="f">نسبة الإنجاز: <output id="o-prog" class="num">'+(t.progress||0)+'٪</output><input type="range" id="f-prog" min="0" max="100" step="5" value="'+(t.progress||0)+'"></label>'+
+   '<label class="f">المسؤول<input id="f-owner" list="owners-list" value="'+esc(t.owner)+'"></label><datalist id="owners-list">'+Object.keys(owners).map(function(o){return '<option value="'+esc(o)+'">'}).join('')+'</datalist>'+
+   '<fieldset><legend>تبدأ بعد انتهاء (المهام السابقة)</legend><div class="preds">'+(predList||'<span class="w">لا توجد مهام متاحة</span>')+'</div></fieldset>'+
+   '<label class="f">ملاحظات<textarea id="f-notes" rows="2">'+esc(t.notes)+'</textarea></label>'+
+   '<p class="note" id="f-note" hidden></p>'+
+   '<footer>'+(isNew?'':'<button type="button" class="btn danger" id="f-del">حذف المهمة</button>')+'<span class="grow"></span><button type="button" class="btn" data-close>إلغاء</button><button type="submit" class="btn primary">'+(isNew?'إضافة':'حفظ')+'</button></footer></form>';
+  var f=$('#task-form'),fs=$('#f-start'),fdur=$('#f-dur'),fe=$('#f-end'),fms=$('#f-ms');
+  function syncMs(){fdur.disabled=fe.disabled=fms.checked}
+  syncMs();fms.addEventListener('change',syncMs);
+  function upEnd(){if(fs.value&&fdur.value)fe.value=diso(dnum(fs.value)+Math.max(1,+fdur.value)-1)}
+  fs.addEventListener('change',upEnd);fdur.addEventListener('input',upEnd);
+  fe.addEventListener('change',function(){if(fs.value&&fe.value){var d=dnum(fe.value)-dnum(fs.value)+1;if(d<1){fe.value=fs.value;d=1}fdur.value=d}});
+  $('#f-prog').addEventListener('input',function(e){$('#o-prog').textContent=e.target.value+'٪'});
+  var del=$('#f-del');
+  if(del)del.addEventListener('click',function(){
+    if(del.dataset.armed){closeDlg();mutate(function(){state.tasks=T().filter(function(x){return x.id!==t.id});T().forEach(function(x){x.preds=x.preds.filter(function(p){return p!==t.id})})});toast('حُذفت المهمة · يمكنك التراجع');return}
+    del.dataset.armed='1';del.textContent='اضغط مرة أخرى لتأكيد الحذف';
+  });
+  f.addEventListener('submit',function(e){
+    e.preventDefault();
+    var name=$('#f-name').value.trim();if(!name){$('#f-name').focus();return}
+    var vals={name:name,phase:$('#f-phase').value,station:$('#f-station').value,ms:fms.checked,start:fs.value||t.start,dur:fms.checked?0:Math.max(1,parseInt(fdur.value,10)||1),progress:+$('#f-prog').value,owner:$('#f-owner').value.trim(),notes:$('#f-notes').value,preds:$$('.preds input:checked',f).map(function(i){return i.value})};
+    closeDlg();
+    mutate(function(){
+      if(isNew){var o=Object.assign({},t,vals);if(!o.ms)delete o.ms;state.tasks.push(o)}
+      else{var x=byId()[t.id];Object.assign(x,vals);if(!x.ms)delete x.ms}
+    });
+    var after=byId()[t.id];if(after&&after.start!==vals.start)toast('رُحّلت البداية إلى '+fd(sDay(after))+' بسبب المهام السابقة');
+    else toast(isNew?'أُضيفت المهمة':'حُفظت التعديلات');
+  });
+  openDlg();setTimeout(function(){var n=$('#f-name');if(n&&isNew)n.focus()},30);
+}
+function openPhase(id){
+  var isNew=!id,ph=isNew?{id:uid('p'),name:'',desc:''}:state.phases.filter(function(p){return p.id===id})[0];if(!ph)return;
+  var count=T().filter(function(t){return t.phase===ph.id}).length,idx=phaseIndex(ph.id);
+  dlg.innerHTML='<form id="phase-form"><header><h2>'+(isNew?'مرحلة جديدة':'تعديل المرحلة')+'</h2><button type="button" class="x" data-close aria-label="إغلاق">×</button></header>'+
+   '<label class="f">اسم المرحلة<input id="p-name" required value="'+esc(ph.name)+'"></label>'+
+   '<label class="f">وصف المرحلة<textarea id="p-desc" rows="3">'+esc(ph.desc)+'</textarea></label>'+
+   (isNew?'':'<div class="toolbar"><button type="button" class="btn sm" id="p-up"'+(idx===0?' disabled':'')+'>نقل لأعلى</button><button type="button" class="btn sm" id="p-down"'+(idx===state.phases.length-1?' disabled':'')+'>نقل لأسفل</button></div>')+
+   '<footer>'+(isNew?'':'<button type="button" class="btn danger" id="p-del">'+(count?'حذف المرحلة و'+count+' مهمة':'حذف المرحلة')+'</button>')+'<span class="grow"></span><button type="button" class="btn" data-close>إلغاء</button><button type="submit" class="btn primary">'+(isNew?'إضافة':'حفظ')+'</button></footer></form>';
+  var f=$('#phase-form');
+  function move(dir){closeDlg();mutate(function(){var a=state.phases,i=phaseIndex(ph.id),j=i+dir;var tmp=a[i];a[i]=a[j];a[j]=tmp})}
+  if(!isNew){$('#p-up').addEventListener('click',function(){move(-1)});$('#p-down').addEventListener('click',function(){move(1)});
+    var del=$('#p-del');del.addEventListener('click',function(){
+      if(del.dataset.armed){closeDlg();mutate(function(){var gone={};T().forEach(function(t){if(t.phase===ph.id)gone[t.id]=1});state.phases=state.phases.filter(function(p){return p.id!==ph.id});state.tasks=T().filter(function(t){return !gone[t.id]});T().forEach(function(t){t.preds=t.preds.filter(function(p){return !gone[p]})})});toast('حُذفت المرحلة · يمكنك التراجع');return}
+      del.dataset.armed='1';del.textContent='اضغط مرة أخرى للتأكيد';});}
+  f.addEventListener('submit',function(e){e.preventDefault();var n=$('#p-name').value.trim();if(!n){$('#p-name').focus();return}var d=$('#p-desc').value;closeDlg();
+    mutate(function(){if(isNew)state.phases.push({id:ph.id,name:n,desc:d});else{var p=state.phases[phaseIndex(ph.id)];p.name=n;p.desc=d}});});
+  openDlg();
+}
+
+/* ---------- plan tab ---------- */
+function renderPlan(){
+  var m=state.meta,s=stats(),wb=wbsMap();
+  var phases=state.phases.map(function(ph,i){
+    var ts=T().filter(function(t){return t.phase===ph.id}),st=ts.length?stats(ts):null;
+    return '<li style="--c:'+phaseColor(i)+'"><span class="n">'+(i+1)+'</span><div class="hd"><h3>'+esc(ph.name)+'</h3>'+
+      (st?'<span class="meta">'+esc(fd(st.start))+' – '+esc(fd(st.end))+' · '+(st.end-st.start+1)+' يوم · '+ts.length+' مهمة · '+Math.round(st.actual)+'٪</span>':'<span class="meta">لا توجد مهام بعد</span>')+'</div>'+
+      '<div class="body">'+(st?'<div class="mini"><i style="width:'+st.actual+'%"></i></div>':'')+'<textarea class="in" data-bind="phase:'+ph.id+':desc" id="pd-'+ph.id+'" aria-label="وصف '+esc(ph.name)+'">'+esc(ph.desc)+'</textarea></div></li>';
+  }).join('');
+  var ms=T().filter(function(t){return t.ms}).map(function(t){return {name:t.name,d:sDay(t),st:status(t),id:t.id}});
+  state.phases.forEach(function(ph){var ts=T().filter(function(t){return t.phase===ph.id&&!t.ms});if(ts.length){var st=stats(ts);ms.push({name:'اكتمال '+ph.name,d:st.end,st:st.actual>=100?'done':TODAY>st.end?'late':'planned'})}});
+  ms.sort(function(a,b){return a.d-b.d});
+  var stPill={done:'ok',late:'bad',active:'warn',planned:'n'};
+  var risks=state.risks.map(function(r){
+    var sel=function(field,list){return '<select class="in" data-bind="risk:'+r.id+':'+field+'" id="r-'+field+'-'+r.id+'">'+list.map(function(v){return '<option'+(v===r[field]?' selected':'')+'>'+v+'</option>'}).join('')+'</select>'};
+    return '<tr><td><textarea class="in" rows="2" data-bind="risk:'+r.id+':risk" id="r-risk-'+r.id+'">'+esc(r.risk)+'</textarea></td><td style="width:110px">'+sel('prob',LEVELS)+'</td><td style="width:110px">'+sel('impact',IMPACTS)+'</td><td><textarea class="in" rows="2" data-bind="risk:'+r.id+':mitigation" id="r-mit-'+r.id+'">'+esc(r.mitigation)+'</textarea></td><td style="width:44px"><button class="btn sm danger" type="button" data-del-risk="'+r.id+'" aria-label="حذف الخطر">×</button></td></tr>';
+  }).join('');
+  var fld=function(label,key,type){return '<label class="f">'+label+'<input class="in" '+(type?'type="'+type+'" ':'')+'id="m-'+key+'" data-bind="meta.'+key+'" value="'+esc(m[key])+'"></label>'};
+  $('#panel-plan').innerHTML='<div class="plan">'+
+   '<section class="card wide"><h2>بطاقة المشروع</h2><div class="fields">'+
+    fld('اسم المشروع','name')+fld('الجهة المالكة','client')+fld('المقاول','contractor')+fld('الاستشاري','consultant')+fld('الموقع','location')+
+    '<label class="f">تاريخ بدء المشروع (يُزيح كل المهام)<input class="in" type="date" id="m-start" data-start value="'+esc(m.start)+'"></label>'+
+    '<label class="f">المحطات (افصل بينها بفاصلة)<input class="in" id="m-stations" data-stations value="'+esc(m.stations.join('، '))+'"></label>'+
+    '<div class="f" style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)">النهاية المتوقعة<span class="ro">'+esc(fd(s.end))+' · '+(s.end-s.start+1)+' يوم</span></div>'+
+   '</div></section>'+
+   '<section class="card wide"><h2>الهدف ونطاق العمل</h2><textarea class="in" id="m-scope" data-bind="meta.scope" rows="4">'+esc(m.scope)+'</textarea></section>'+
+   '<section class="card"><h2>مراحل التنفيذ</h2><p class="lead">التواريخ والنسب محسوبة من الجدول الزمني. الوصف قابل للتعديل.</p><ol class="phases">'+phases+'</ol><div><button class="btn sm" type="button" data-act="add-phase">+ مرحلة جديدة</button></div></section>'+
+   '<div style="display:flex;flex-direction:column;gap:16px;min-width:0">'+
+   '<section class="card"><h2>المعالم الرئيسية</h2><div class="tw"><table class="t"><thead><tr><th>المعلم</th><th>التاريخ</th><th>الحالة</th></tr></thead><tbody>'+
+     ms.map(function(x){return '<tr><td>'+(x.id?'<button class="nm" type="button" data-edit="'+x.id+'" style="padding:0;height:auto;white-space:normal"><span class="t">'+esc(x.name)+'</span></button>':esc(x.name))+'</td><td class="num">'+esc(fd(x.d))+'</td><td><span class="pill '+stPill[x.st]+'">'+STLBL[x.st]+'</span></td></tr>'}).join('')+
+   '</tbody></table></div></section>'+
+   '<section class="card"><h2>آلية المتابعة والتقارير</h2><textarea class="in" id="m-governance" data-bind="meta.governance" rows="5">'+esc(m.governance)+'</textarea></section></div>'+
+   '<section class="card wide"><h2>سجل المخاطر</h2><div class="tw"><table class="t risk"><thead><tr><th>الخطر</th><th>الاحتمالية</th><th>الأثر</th><th>الإجراء الوقائي</th><th></th></tr></thead><tbody>'+risks+'</tbody></table></div><div><button class="btn sm" type="button" data-act="add-risk">+ خطر جديد</button></div></section>'+
+  '</div>';
+}
+var plan=$('#panel-plan'),focusSnap=false;
+plan.addEventListener('focusin',function(e){if(e.target.dataset&&e.target.dataset.bind&&!focusSnap){snap();focusSnap=true}});
+plan.addEventListener('focusout',function(){focusSnap=false});
+function bindSet(el){
+  var p=el.dataset.bind,v=el.value,parts;
+  if(p.indexOf('meta.')===0)state.meta[p.slice(5)]=v;
+  else if((parts=p.split(':'))[0]==='phase'){var ph=state.phases[phaseIndex(parts[1])];if(ph)ph[parts[2]]=v}
+  else if(parts[0]==='risk'){state.risks.forEach(function(r){if(r.id===parts[1])r[parts[2]]=v})}
+  dirty=true;saveDraft();renderSave();
+  if(p==='meta.name'||p==='meta.location'||p==='meta.client'||p==='meta.contractor')renderHeader();
+}
+plan.addEventListener('input',function(e){if(e.target.dataset.bind)bindSet(e.target)});
+plan.addEventListener('change',function(e){
+  var el=e.target;
+  if(el.dataset.bind&&el.tagName==='SELECT'){bindSet(el);return}
+  if(el.hasAttribute('data-start')&&el.value){var delta=dnum(el.value)-dnum(state.meta.start);if(!delta)return;mutate(function(){state.meta.start=el.value;T().forEach(function(t){t.start=diso(sDay(t)+delta)})});toast('أُزيحت كل المهام '+Math.abs(delta)+' يوماً '+(delta>0?'للأمام':'للخلف'));return}
+  if(el.hasAttribute('data-stations')){var list=el.value.split(/[،,]/).map(function(s){return s.trim()}).filter(Boolean);mutate(function(){state.meta.stations=list});return}
+});
+plan.addEventListener('click',function(e){
+  var b;
+  if((b=e.target.closest('[data-del-risk]'))){var id=b.dataset.delRisk;mutate(function(){state.risks=state.risks.filter(function(r){return r.id!==id})});return}
+  if((b=e.target.closest('[data-edit]'))){openTask(b.dataset.edit);return}
+  if((b=e.target.closest('[data-act="add-risk"]'))){mutate(function(){state.risks.push({id:uid('r'),risk:'',prob:'متوسطة',impact:'متوسط',mitigation:''})});var tas=$$('#panel-plan [data-bind$=":risk"]');if(tas.length)tas[tas.length-1].focus();return}
+  if((b=e.target.closest('[data-act="add-phase"]'))){openPhase(null)}
+});
+
+/* ---------- global events ---------- */
+document.addEventListener('click',function(e){
+  var b=e.target.closest('button');if(!b)return;
+  if(b.dataset.tab){ui.tab=b.dataset.tab;saveUi();renderTabs();return}
+  if(b.dataset.zoom){ui.zoom=b.dataset.zoom;saveUi();var mid=G.d0+(-gEl.scrollLeft+gEl.clientWidth/2)/G.ppd;renderGantt();scrollToDay(Math.round(mid));return}
+  var act=b.dataset.act;
+  if(act==='hide-note'){ui.hideNote=true;saveUi();renderBanners()}
+  else if(act==='discard-draft'){clearDraft();state=JSON.parse(JSON.stringify(pageState));schedule();dirty=false;hist=[];fut=[];draftBanner=null;renderAll()}
+  else if(act==='restore-old'){snap();state=draft.state;schedule();draftBanner=null;changed()}
+  else if(act==='drop-old'){clearDraft();draftBanner=null;renderBanners()}
+});
+$('#btn-today').addEventListener('click',function(){scrollToDay(TODAY>=G.d0&&TODAY<=G.d1?TODAY:stats().start)});
+$('#btn-undo').addEventListener('click',undo);$('#btn-redo').addEventListener('click',redo);
+$('#btn-add-task').addEventListener('click',function(){newTask(null)});
+$('#btn-add-phase').addEventListener('click',function(){openPhase(null)});
+$('#station-filter').addEventListener('change',function(e){ui.station=e.target.value;saveUi();renderGantt()});
+$('#btn-save').addEventListener('click',save);
+$('#btn-export').addEventListener('click',exportCsv);
+document.addEventListener('keydown',function(e){
+  if((e.ctrlKey||e.metaKey)&&!e.altKey&&(e.key==='z'||e.key==='Z')){var tg=e.target.tagName;if(tg==='INPUT'||tg==='TEXTAREA')return;e.preventDefault();e.shiftKey?redo():undo()}
+});
+
+/* ---------- save / export ---------- */
+function buildDoc(next){
+  var hs=document.head.querySelector('style');
+  var reset=hs?hs.textContent:'';
+  var json=JSON.stringify(next).replace(/</g,'\\u003c');
+  return '<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>'+reset+'</style></head><body>'+
+    '<title>'+TITLE+'</title>'+$('#fonts').outerHTML+'<style id="app-css">'+$('#app-css').textContent+'</style><div id="app"></div>'+
+    '<script type="application/json" id="plan-data">'+json+'<\/script><script id="app-js">'+$('#app-js').textContent+'<\/script></body></html>';
+}
+function save(){
+  if(!art||saving||!dirty)return;
+  saving=true;renderSave();
+  var next=JSON.parse(JSON.stringify(state));next.rev=baseRev+1;next.meta.updated=new Date().toISOString();
+  art.publish(buildDoc(next)).then(function(){clearDraft();dirty=false;saving=false;renderSave();toast('حُفظت الخطة، وتظهر الآن لكل من يفتح الرابط')})
+  .catch(function(err){
+    saving=false;var c=err&&err.code;
+    if(c==='conflict')toast('حفظ شخص آخر نسخة أحدث وسيتم تحميلها الآن. تعديلاتك باقية كمسودة في هذا المتصفح.');
+    else if(['not_writer','not_granted','not_declared','consent_required','capability_disabled','capability_removed'].indexOf(c)>=0){readOnly=true;toast('لا تملك صلاحية تعديل هذه الصفحة. تعديلاتك محفوظة في هذا المتصفح فقط.')}
+    else if(c==='rate_limited')toast('محاولات حفظ كثيرة. انتظر دقيقة ثم احفظ مرة أخرى.');
+    else if(c==='too_large')toast('الخطة أكبر من الحد المسموح للحفظ.');
+    else toast('تعذّر الحفظ بسبب مشكلة في الاتصال. حاول مرة أخرى.');
+    renderSave();
+  });
+}
+function exportCsv(){
+  if(!dl)return;
+  var wb=wbsMap(),m=byId();
+  var q=function(v){v=String(v==null?'':v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
+  var rows=[['الرقم','المرحلة','المهمة','الموقع','البداية','النهاية','المدة (يوم)','الإنجاز %','الحالة','المسؤول','تبدأ بعد','ملاحظات']];
+  state.phases.forEach(function(ph){T().forEach(function(t){if(t.phase!==ph.id)return;
+    rows.push([wb[t.id],ph.name,t.name,t.station,t.start,diso(endDay(t)),t.ms?0:t.dur,t.progress||0,STLBL[status(t)],t.owner,t.preds.map(function(p){return wb[p]||''}).join(' '),t.notes])})});
+  var csv='﻿'+rows.map(function(r){return r.map(q).join(',')}).join('\r\n');
+  dl.save({filename:'hafr-albatin-lifting-stations-schedule.csv',data:csv}).then(function(){toast('جُهّز ملف الجدول الزمني')}).catch(function(err){
+    var c=err&&err.code;if(c==='declined')return;
+    if(['unavailable','not_granted','capability_disabled','capability_removed'].indexOf(c)>=0){dl=null;$('#btn-export').hidden=true;return}
+    toast(c==='rate_limited'?'نافذة حفظ مفتوحة بالفعل.':'تعذّر تجهيز الملف.');
+  });
+}
+
+/* ---------- boot ---------- */
+function renderAll(){renderHeader();renderBanners();renderKpis();renderTabs();renderGantt();renderPlan();renderSave()}
+schedule();
+renderAll();
+
+if(window['cl'+'aude']&&typeof window['cl'+'aude'].use==='function'){
+  window['cl'+'aude'].use('artifact').then(function(a){art=a;artKnown=true;renderSave()},function(){artKnown=true;renderSave()});
+  window['cl'+'aude'].use('downloads').then(function(d){dl=d;$('#btn-export').hidden=!d});
+}else{artKnown=true;renderSave()}
+})();
+</script>
