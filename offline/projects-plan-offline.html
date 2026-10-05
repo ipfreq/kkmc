@@ -1056,7 +1056,7 @@ app.innerHTML=
  '<section class="contract" aria-label="موقف المدة التعاقدية"><div class="c-in"><h2 id="c-title"></h2>'+
   '<label class="f">تاريخ استلام الموقع<input class="in" type="date" id="c-receipt" data-c="receiptDate"></label>'+
   '<div class="g2"><label class="f">مدة العقد (يوم)<input class="in" type="number" min="1" id="c-days" data-c="contractDays"></label><label class="f">أيام التمديد المعتمدة<input class="in" type="number" min="0" id="c-ext" data-c="extDays"></label></div>'+
-  '<label class="f">تاريخ بدء الأعمال (اليوم 1 في الجدول، يحسب يوم المشروع الحالي تلقائياً)<input class="in" type="date" id="c-wstart" data-c="workStart"></label>'+
+  '<label class="f">تاريخ بدء الأعمال المتبقية (اليوم 1 في الجدول، وليس تاريخ استلام الموقع)<input class="in" type="date" id="c-wstart" data-c="workStart"></label>'+
   '<label class="f">المدة المستهدفة للتنفيذ (يوم، اتركها 0 بدون حد)<input class="in" type="number" min="0" id="c-target" data-c="targetDays"></label></div>'+
   '<div class="c-out" id="contract-out"></div></section>'+
  '<section class="kpis" id="kpis" aria-label="ملخص التنفيذ"></section>'+
@@ -1111,7 +1111,7 @@ function renderKpis(){
   var s=stats(),n=T().length,c={done:0,late:0,active:0,planned:0},cd=cur();
   T().forEach(function(t){c[status(t)]++});
   var dur=s.end-s.start+1,dev=s.actual-s.planned;
-  var pill=cd===0?(s.actual>0?'<span class="pill warn">اكتب «يوم المشروع الحالي» أو تاريخ بدء الأعمال لحساب المخطط</span>':'<span class="pill n">لم يبدأ التنفيذ</span>'):dev<-5?'<span class="pill bad">متأخر '+Math.abs(dev).toFixed(1)+'٪</span>':dev>2?'<span class="pill ok">متقدم '+dev.toFixed(1)+'٪</span>':'<span class="pill ok">ضمن الخطة</span>';
+  var far=cd>s.end+7;var pill=far?'<span class="pill warn">اليوم الحالي '+cd+' بعد نهاية الجدول (اليوم '+s.end+'). راجع «تاريخ بدء الأعمال»: هو أول يوم في الجدول وليس تاريخ استلام الموقع</span>':cd===0?(s.actual>0?'<span class="pill warn">اكتب «يوم المشروع الحالي» أو تاريخ بدء الأعمال لحساب المخطط</span>':'<span class="pill n">لم يبدأ التنفيذ</span>'):dev<-5?'<span class="pill bad">متأخر '+Math.abs(dev).toFixed(1)+'٪</span>':dev>2?'<span class="pill ok">متقدم '+dev.toFixed(1)+'٪</span>':'<span class="pill ok">ضمن الخطة</span>';
   $('#kpis').innerHTML=
    '<div class="kpi"><span class="k">مدة التنفيذ المخططة</span><span class="v">'+dur+'<small>يوم · '+wk(dur)+' أسبوع</small></span><span class="s num">من اليوم '+s.start+' إلى اليوم '+s.end+' '+(target()?(dur>target()?'<span class="pill bad">تتجاوز الحد '+target()+' يوم</span> <button class="btn sm" type="button" data-act="compress">ضغط الجدول إلى '+target()+' يوم</button>':'<span class="pill ok">ضمن الحد '+target()+' يوم</span>'):'')+'</span></div>'+
    '<div class="kpi"><span class="k">الإنجاز الفعلي مقابل المخطط</span><span class="v">'+s.actual.toFixed(1)+'٪<small>'+(cd?'المخطط حتى اليوم '+cd+': '+s.planned.toFixed(1)+'٪':'المخطط: غير محدد')+'</small></span><div class="dual"><i class="pl" style="width:'+(cd?s.planned:0)+'%"></i><i class="ac" style="width:'+s.actual+'%"></i></div><span class="s">'+pill+'</span></div>'+
@@ -1525,7 +1525,7 @@ document.addEventListener('click',function(e){
   else if(act==='proj-del'){if(root.projects.length<2)return;if(!b.dataset.armed){b.dataset.armed='1';b.textContent='اضغط مرة أخرى لحذف «'+(state.meta.project||'المشروع')+'»';return}
     snap();var gone=state.meta.project;root.projects=root.projects.filter(function(p){return p.id!==state.id});dirty=true;saveDraft();ui.active=root.projects[0].id;pickActive();ui.view='home';saveUi();renderAll();toast('حُذف المشروع «'+gone+'» · يمكنك التراجع')}
 });
-document.addEventListener('change',function(e){var i=e.target;if(!i.dataset||!i.dataset.c)return;var k=i.dataset.c,v=(k==='receiptDate'||k==='workStart')?i.value:Math.max(0,parseInt(i.value,10)||0);if(state.meta[k]===v)return;snap();state.meta[k]=v;if(k==='targetDays'&&v>0&&planDur()>v)doCompress(v);changed()});
+document.addEventListener('change',function(e){var i=e.target;if(!i.dataset||!i.dataset.c)return;var k=i.dataset.c,v=(k==='receiptDate'||k==='workStart')?i.value:Math.max(0,parseInt(i.value,10)||0);if(state.meta[k]===v)return;snap();state.meta[k]=v;if(k==='workStart'&&v){var ad=autoDay(),se=stats().end;if(ad!=null&&ad>se+7)toast('هذا التاريخ يجعل اليوم الحالي '+ad+' بينما الجدول '+se+' يوم فقط. اكتب أول يوم بدأت فيه الأعمال المتبقية، وليس تاريخ استلام الموقع.')}if(k==='targetDays'&&v>0&&planDur()>v)doCompress(v);changed()});
 $('#cur-day').addEventListener('change',function(e){var v=Math.max(0,parseInt(e.target.value,10)||0);if(v===cur())return;snap();state.meta.curDay=v;changed()});
 $('#btn-undo').addEventListener('click',undo);$('#btn-redo').addEventListener('click',redo);
 $('#btn-add-task').addEventListener('click',function(){newTask(null)});
