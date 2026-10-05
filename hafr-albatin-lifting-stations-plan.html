@@ -329,6 +329,7 @@ var dnum=function(iso){return Math.round(Date.parse(iso+'T00:00:00Z')/DAY)};
 var fDate=new Intl.DateTimeFormat('ar-u-nu-latn-ca-gregory',{day:'numeric',month:'long',year:'numeric',timeZone:'UTC'});
 var fd=function(n){return fDate.format(new Date(n*DAY))};
 function todayNum(){var d=new Date();return Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())/DAY}
+var HOST=(function(h){return h&&typeof h.use==='function'?h:null})(window['cl'+'aude']);
 var DRAFT_KEY='kkmc-remaining-plan-draft-v1', UI_KEY='kkmc-remaining-plan-ui-v1';
 var TITLE='محطات رفع حفر الباطن';
 function L(k){return esc(state.meta.labels[k]||DEF_LABELS[k]||'')}
@@ -546,7 +547,7 @@ function renderSave(){
   else if(dirty){chip.className='chip warn';chip.textContent='تعديلات غير محفوظة'}
   else{chip.className='chip ok';chip.textContent='محفوظ'}
   $('#btn-undo').disabled=!hist.length;$('#btn-redo').disabled=!fut.length;
-  $('#btn-pdf').hidden=$('#btn-export').hidden=(dlKnown&&!dl)||ui.view==='home';
+  $('#btn-pdf').hidden=$('#btn-export').hidden=(dlKnown&&!dl&&!!HOST)||ui.view==='home';
 }
 function renderTabs(){
   $$('.tabs button').forEach(function(b){b.setAttribute('aria-selected',b.dataset.tab===ui.tab?'true':'false')});
@@ -939,6 +940,7 @@ function save(){
   });
 }
 function offerFile(name,data,okMsg){
+  if(!dl&&!HOST){var bl=data instanceof Blob?data:new Blob([data],{type:'application/octet-stream'}),u=URL.createObjectURL(bl),a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(u)},4000);toast(okMsg);return Promise.resolve()}
   if(!dl){toast('تحميل الملفات غير متاح في هذا العرض.');return Promise.resolve()}
   return dl.save({filename:name,data:data}).then(function(){toast(okMsg)}).catch(function(err){
     var c=err&&err.code;if(c==='declined')return;
@@ -1037,7 +1039,7 @@ function buildPdfPages(host){
 }
 function exportPdf(){
   if(busy)return;
-  if(dlKnown&&!dl){toast('تحميل الملفات غير متاح في هذا العرض.');return}
+  if(dlKnown&&!dl&&HOST){toast('تحميل الملفات غير متاح في هذا العرض.');return}
   busy=true;
   var veil=el('div','pdf-veil','<div><span class="spin"></span><b>جارٍ تجهيز ملف PDF…</b><span id="pdf-prog" class="num"></span></div>');
   var host=el('div','pdf-host');
@@ -1080,9 +1082,9 @@ function renderPreview(){
 window.addEventListener('resize',function(){schedulePreview()});
 schedule();
 renderAll();
-if(window['cl'+'aude']&&typeof window['cl'+'aude'].use==='function'){
-  window['cl'+'aude'].use('artifact').then(function(a){art=a;artKnown=true;renderSave()},function(){artKnown=true;renderSave()});
-  window['cl'+'aude'].use('downloads').then(function(d){dl=d;dlKnown=true;renderSave()},function(){dlKnown=true;renderSave()});
+if(HOST){
+  HOST.use('artifact').then(function(a){art=a;artKnown=true;renderSave()},function(){artKnown=true;renderSave()});
+  HOST.use('downloads').then(function(d){dl=d;dlKnown=true;renderSave()},function(){dlKnown=true;renderSave()});
 }else{artKnown=true;dlKnown=true;renderSave()}
 })();
 </script>
