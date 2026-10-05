@@ -386,7 +386,7 @@ if(!ZOOM[ui.zoom])ui.zoom='week';if(['gantt','plan','pdf'].indexOf(ui.tab)<0)ui.
 var dirty=false,saving=false,hist=[],fut=[],art=null,dl=null,artKnown=false,dlKnown=false,readOnly=false,busy=false;
 var draftBanner=null;
 var draft=ls(function(){return JSON.parse(localStorage.getItem(DRAFT_KEY)||'null')});
-if(draft&&draft.state){normRoot(draft.state);if(draft.rev===baseRev){root=draft.state;dirty=true;draftBanner='restored'}else draftBanner='older'}
+if(draft&&draft.state){normRoot(draft.state);if(draft.rev===baseRev){root=draft.state;dirty=JSON.stringify(draft.state)!==JSON.stringify(pageState);draftBanner=HOST?'restored':null}else if(HOST||draft.rev>baseRev)draftBanner='older';else clearDraft()}
 function pickActive(){
   var p=root.projects.filter(function(x){return x.id===ui.active})[0]||root.projects.filter(function(x){return x.id===root.active})[0]||root.projects[0];
   state=p;ui.active=p.id;
@@ -538,6 +538,7 @@ function renderProjects(){
 }
 function renderSave(){
   var chip=$('#save-chip'),b=$('#btn-save');
+  if(!HOST){b.hidden=false;b.disabled=!dirty;b.textContent='حفظ نسخة محدّثة من الملف';chip.className='chip ok';chip.textContent=dirty?'محفوظ تلقائياً على هذا الجهاز · نسخة الملف أقدم':'محفوظ على هذا الجهاز';$('#btn-undo').disabled=!hist.length;$('#btn-redo').disabled=!fut.length;$('#btn-pdf').hidden=$('#btn-export').hidden=ui.view==='home';return}
   b.hidden=readOnly||(artKnown&&!art);
   b.disabled=!dirty||saving||!art;
   b.textContent=saving?'جارٍ الحفظ…':'حفظ التعديلات للجميع';
@@ -922,9 +923,14 @@ function buildDoc(next){
   var json=JSON.stringify(next).replace(/</g,'\\u003c');
   return '<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>'+(hs?hs.textContent:'')+'</style></head><body>'+
     '<title>'+esc(next.projects.length>1?'خطط العمل والجداول الزمنية':(next.projects[0].meta.project||TITLE).slice(0,80))+'</title>'+$('#fonts').outerHTML+'<style id="app-css">'+$('#app-css').textContent+'</style><div id="app"></div>'+
-    '<script type="application/json" id="plan-data">'+json+'<\/script><script id="app-js">'+$('#app-js').textContent+'<\/script></body></html>';
+    '<script type="application/json" id="plan-data">'+json+'<\/script>'+['lib-h2c','lib-jspdf'].map(function(id){var e=document.getElementById(id);return e?'<script id="'+id+'">'+e.textContent+'<\/script>':''}).join('')+'<script id="app-js">'+$('#app-js').textContent+'<\/script></body></html>';
+}
+function saveLocal(){
+  var next=clone(root);next.rev=baseRev+1;next.active=state.id;next.projects.forEach(function(p){if(p.id===state.id)p.meta.updated=new Date().toISOString()});
+  offerFile('خطط-المشاريع.html',buildDoc(next),'جُهّزت نسخة محدّثة من الملف. افتحها بدل النسخة القديمة.').then(function(){baseRev=next.rev;root=next;pickActive();dirty=false;saveDraft();renderAll()});
 }
 function save(){
+  if(!HOST){saveLocal();return}
   if(!art||saving||!dirty)return;
   saving=true;renderSave();
   var next=clone(root);next.rev=baseRev+1;next.active=state.id;next.projects.forEach(function(p){if(p.id===state.id)p.meta.updated=new Date().toISOString()});
