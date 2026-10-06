@@ -34,6 +34,13 @@ function planToValves(p, base) {
     var id = ok(b.id) ? b.id : 'b' + (i + 1); bmap[b.no || String(i + 1)] = id;
     return { id: id, no: String(b.no || i + 1), dia: '', unit: b.unit || '', qty: n(b.qty), rate: b.rate === '' || b.rate == null ? '' : n(b.rate), desc: b.item || b.desc || '' };
   });
+  // A plan without contract items (remaining works) takes its items from the per-station quantity table.
+  if (!st.boq.length) {
+    st.boq = (p.qty || []).map(function (q, i) {
+      return { id: 'b' + (i + 1), no: String(i + 1), dia: '', unit: q.unit || '', qty: (q.q || []).reduce(function (s, v) { return s + n(v); }, 0), rate: '', desc: q.item || '' };
+    });
+    st.boq.forEach(function (b) { bmap[b.no] = b.id; });
+  }
   st.installs = []; st.supplies = []; st.expenses = []; st.events = [];
   (p.boq || []).forEach(function (b, i) {
     if (n(b.done) > 0) st.installs.push({ id: 'i' + (i + 1), date: todayIso, boq: st.boq[i].id, qty: n(b.done), loc: '', serial: '', test: '', shut: '', team: '', notes: 'الكمية المنفذة المسجلة في الخطة السابقة' });

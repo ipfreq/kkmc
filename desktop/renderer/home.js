@@ -109,7 +109,7 @@
     else if (a === 'import') api.importProject().then(function (nid) { if (nid) go(nid, '&import=1'); });
     else if (a === 'backup') api.backupNow().then(function (f) { toast('تم حفظ نسخة احتياطية: ' + f); });
     else if (a === 'restore') confirmBox('استرجاع نسخة احتياطية يستبدل كل المشاريع الحالية بمحتوى النسخة المختارة. تُحفظ نسخة من الوضع الحالي قبل الاسترجاع.', 'اختيار النسخة', function () {
-      api.restore().then(function (ok) { if (ok) { toast('تم استرجاع النسخة الاحتياطية'); load(); } });
+      api.restore().then(function (ok) { return ok ? api.kv('defaults_v2', '1').then(function () { return ok; }) : ok; }).then(function (ok) { if (ok) { toast('تم استرجاع النسخة الاحتياطية'); load(); } });
     });
     else if (a === 'folder') api.openData();
   });
@@ -117,8 +117,10 @@
 
   api.info().then(function (i) { $('#dbinfo').textContent = i.dbPath; $('#ver').textContent = '· الإصدار ' + i.version; });
 
-  /* One-time move of work plans (lift stations) into projects with the full structure.
-     Each plan inside becomes its own project; the original is kept in the archive. */
+  /* Default content: the valves project and the lift-stations remaining-works project.
+     Runs on first start, after a factory reset, and once when upgrading (archived and old plan projects are removed). */
+  // Projects made automatically by version 1.4; removed on upgrade when never edited, so they are rebuilt with the current converter.
+  var AUTO_NAMES = ['توسعة وتأهيل وإصلاح محطات الرفع للبنية التحتية – المشروع كامل', 'الأعمال المتبقية – محطات رفع حي بدر والتعاون و200 فيلا'];
   function projectDocs(st) {
     var meta = JSON.parse(JSON.stringify(st.meta)); delete meta.updated;
     var out = { 'project/meta': meta, 'project/report': st.report, 'project/settings': { expCats: st.expCats, v: 1 } };
@@ -127,30 +129,75 @@
     });
     return out;
   }
-  function migratePlans() {
-    return api.kv('plans_moved_v1').then(function (done) {
+  function addProject(st) {
+    return api.create(st.meta.name, 'valves').then(function (id) {
+      var docs = projectDocs(st);
+      return Object.keys(docs).reduce(function (c, path) { return c.then(function () { return api.set(id, path, docs[path]); }); }, Promise.resolve());
+    });
+  }
+  function setupDefaults() {
+    return api.kv('defaults_v2').then(function (done) {
       if (done) return false;
-      return api.projects().then(function (all) {
-        var plans = all.filter(function (p) { return p.type === 'plan'; });
-        return plans.reduce(function (chain, p) {
-          return chain.then(function () { return api.planGet(p.id); }).then(function (root) {
-            var inner = root && Array.isArray(root.projects) ? root.projects : [];
-            return inner.reduce(function (c2, plan) {
-              return c2.then(function () {
-                var st = planToValves(plan, DEFAULT_PROJECT());
-                return api.create(st.meta.name, 'valves').then(function (id) {
-                  var docs = projectDocs(st);
-                  return Object.keys(docs).reduce(function (c3, path) { return c3.then(function () { return api.set(id, path, docs[path]); }); }, Promise.resolve());
-                });
-              });
-            }, Promise.resolve()).then(function () { return api.archive(p.id, true); });
-          });
-        }, Promise.resolve()).then(function () { return api.kv('plans_moved_v1', '1'); }).then(function () { return plans.length > 0; });
+      return api.cleanup(AUTO_NAMES).then(function () { return Promise.all([api.projects(), api.planTemplate()]); }).then(function (r) {
+        var names = r[0].map(function (p) { return (p.summary && p.summary.name) || p.name || ''; }), add = [];
+        var valves = DEFAULT_PROJECT();
+        if (names.indexOf(valves.meta.name) < 0) add.push(valves);
+        var rem = ((r[1] && r[1].projects) || []).filter(function (p) { return /الأعمال المتبقية/.test((p.meta || {}).project || ''); })[0];
+        if (rem && !names.some(function (n) { return /الأعمال المتبقية/.test(n); })) add.push(planToValves(rem, DEFAULT_PROJECT()));
+        return add.reduce(function (c, st) { return c.then(function () { return addProject(st); }); }, Promise.resolve())
+          .then(function () { return api.kv('defaults_v2', '1'); }).then(function () { return true; });
       });
     }).catch(function () { return false; });
   }
-  migratePlans().then(function (moved) {
-    if (moved) toast('تم نقل خطط محطات الرفع إلى مشاريع بكل الأقسام. النسخة الأصلية محفوظة في «المؤرشفة».');
+
+  /* Database tools */
+  function exportDb() { return api.exportDb().then(function (f) { if (f) toast('تم نسخ قاعدة البيانات إلى: ' + f); }); }
+  function loadDb() {
+    api.pickDb().then(function (r) {
+      if (!r) return;
+      if (r.error) { toast('الملف المختار ليس قاعدة بيانات للبرنامج'); return; }
+      var list = r.projects.map(function (p) { return '<li>' + esc(p.name || 'مشروع') + '</li>'; }).join('') || '<li>لا توجد مشاريع</li>';
+      var d = $('#dlg');
+      d.innerHTML = '<form method="dialog"><h2>تحميل قاعدة بيانات</h2><p style="margin:0">الملف يحتوي على ' + r.projects.length + ' مشروع:</p><ul style="margin:0;max-height:180px;overflow:auto">' + list + '</ul>' +
+        '<p class="meta" style="margin:0">«إضافة» يضيف هذه المشاريع بجانب مشاريعك الحالية. «استبدال» يجعل البرنامج مطابقاً للملف (تُحفظ نسخة احتياطية من الوضع الحالي أولاً).</p>' +
+        '<div class="dlg-f"><button type="button" class="btn" data-close>إلغاء</button><button type="button" class="btn" data-mode="merge">إضافة للمشاريع الحالية</button><button type="button" class="btn danger" data-mode="replace">استبدال كل المشاريع</button></div></form>';
+      d.querySelector('[data-close]').onclick = function () { d.close(); };
+      d.querySelectorAll('[data-mode]').forEach(function (b) {
+        b.onclick = function () {
+          d.close();
+          api.loadDb(r.file, b.getAttribute('data-mode')).then(function (n) { return (n === -1 ? api.kv('defaults_v2', '1') : Promise.resolve()).then(function () { return n; }); }).then(function (n) {
+            toast(n === -1 ? 'تم تحميل قاعدة البيانات واستبدال المشاريع' : 'تمت إضافة ' + n + ' مشروع'); load();
+          }).catch(function () { toast('تعذّر تحميل قاعدة البيانات'); });
+        };
+      });
+      d.showModal();
+    });
+  }
+  function resetApp() {
+    var d = $('#dlg');
+    d.innerHTML = '<form method="dialog"><h2>إعادة ضبط البرنامج</h2>' +
+      '<p style="margin:0;line-height:1.8">سيتم حذف كل المشاريع وقاعدة البيانات وكل النسخ الاحتياطية المخزنة من النسخ السابقة، ويعود البرنامج كأول تثبيت بمشروعين فقط: مشروع المحابس، ومشروع الأعمال المتبقية في محطات الرفع.</p>' +
+      '<p style="margin:0"><button type="button" class="btn sm" data-export>نسخ قاعدة البيانات أولاً</button></p>' +
+      '<label class="f">للتأكيد اكتب كلمة: تصفير<input class="in" name="word" autocomplete="off"></label>' +
+      '<div class="dlg-f"><button type="button" class="btn" data-close>إلغاء</button><button class="btn danger" disabled>إعادة ضبط البرنامج</button></div></form>';
+    var f = d.querySelector('form'), ok = f.querySelector('.btn.danger');
+    f.elements.word.addEventListener('input', function () { ok.disabled = f.elements.word.value.trim() !== 'تصفير'; });
+    d.querySelector('[data-close]').onclick = function () { d.close(); };
+    d.querySelector('[data-export]').onclick = function () { exportDb(); };
+    f.addEventListener('submit', function (e) {
+      e.preventDefault(); if (ok.disabled) return; d.close();
+      api.wipeDb().then(setupDefaults).then(function () { toast('تمت إعادة ضبط البرنامج'); load(); });
+    });
+    d.showModal(); f.elements.word.focus();
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-tool]'); if (!b) return;
+    var t = b.getAttribute('data-tool');
+    if (t === 'export') exportDb(); else if (t === 'load') loadDb(); else if (t === 'reset') resetApp();
+  });
+
+  setupDefaults().then(function (added) {
+    if (added) toast('تم تجهيز المشاريع الافتراضية: مشروع المحابس، والأعمال المتبقية في محطات الرفع.');
     load();
   });
 })();

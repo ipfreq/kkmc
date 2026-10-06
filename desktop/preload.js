@@ -25,5 +25,11 @@ contextBridge.exposeInMainWorld('DESKTOP', {
   planSave: (id, root) => call('plan:save', id, root),
   home: () => call('app:home'),
   planGet: id => call('plan:get', id),
-  kv: (key, value) => call('app:kv', key, value)
+  kv: (key, value) => call('app:kv', key, value),
+  planTemplate: () => call('plan:template'),
+  cleanup: name => call('projects:cleanup', name),
+  exportDb: () => call('db:export'),
+  pickDb: () => call('db:pick'),
+  loadDb: (file, mode) => call('db:load', file, mode),
+  wipeDb: () => call('db:wipe')
 });

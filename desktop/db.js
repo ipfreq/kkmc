@@ -85,6 +85,64 @@ class Store {
     this.flush();
   }
 
+  /* ---- whole-database tools ---- */
+  // Reads another database file and describes its projects, without changing anything.
+  inspect(file) {
+    const other = new this.SQL.Database(fs.readFileSync(file));
+    try {
+      const st = other.prepare('SELECT id, name, type, archived FROM projects'); const list = [];
+      while (st.step()) list.push(st.getAsObject()); st.free();
+      return list.filter(p => !p.archived && p.type !== 'plan');
+    } finally { other.close(); }
+  }
+
+  // Adds every project of another database file to this one (new ids where they clash).
+  merge(file) {
+    this.backupNow();
+    const other = new this.SQL.Database(fs.readFileSync(file));
+    let n = 0;
+    try {
+      const ps = other.prepare("SELECT * FROM projects WHERE archived=0 AND type<>'plan'"); const projects = [];
+      while (ps.step()) projects.push(ps.getAsObject()); ps.free();
+      projects.forEach(p => {
+        let id = p.id;
+        if (this.all('SELECT 1 FROM projects WHERE id=?', [id]).length) id = 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+        this.db.run('INSERT INTO projects(id,type,name,created,updated,archived) VALUES(?,?,?,?,?,0)', [id, p.type, p.name, p.created, p.updated]);
+        const rs = other.prepare('SELECT coll, id, data FROM records WHERE project=?'); rs.bind([p.id]);
+        while (rs.step()) { const r = rs.getAsObject(); this.db.run('INSERT INTO records(project,coll,id,data) VALUES(?,?,?,?)', [id, r.coll, r.id, r.data]); }
+        rs.free(); n++;
+      });
+    } finally { other.close(); }
+    this.flush();
+    return n;
+  }
+
+  // Factory reset: empties the database and deletes every stored backup from earlier versions.
+  // The home page then adds the default projects again.
+  wipe() {
+    this.db.run('DELETE FROM records'); this.db.run('DELETE FROM projects'); this.db.run('DELETE FROM kv');
+    this.flush();
+    fs.readdirSync(this.backups).forEach(f => { try { fs.unlinkSync(path.join(this.backups, f)); } catch (e) { /* in use */ } });
+    try { fs.unlinkSync(this.file + '.tmp'); } catch (e) { /* none */ }
+    return true;
+  }
+
+  // Removes archived projects, old work-plan projects, and the untouched copy made by the first plan move.
+  cleanup(convertedNames) {
+    const ids = this.all("SELECT id FROM projects WHERE archived=1 OR type='plan'").map(r => r.id);
+    if (Array.isArray(convertedNames) && this.kv('plans_moved_v1')) {
+      convertedNames.forEach(name => this.all("SELECT id FROM projects WHERE type='valves' AND name=?", [name]).forEach(r => {
+        const edited = this.all("SELECT 1 FROM records WHERE project=? AND coll='history' AND id<>'_pos' LIMIT 1", [r.id]).length;
+        if (!edited) ids.push(r.id);
+      }));
+    }
+    if (!ids.length) return 0;
+    this.backupNow();
+    ids.forEach(id => { this.db.run('DELETE FROM records WHERE project=?', [id]); this.db.run('DELETE FROM projects WHERE id=?', [id]); });
+    this.flush();
+    return ids.length;
+  }
+
   /* ---- records (one row per sheet line) ---- */
   list(project, coll) {
     return this.all('SELECT id, data FROM records WHERE project=? AND coll=?', [project, coll])

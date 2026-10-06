@@ -97,6 +97,32 @@ function handlers() {
   h('plan:open', (e, id) => { openPlan(id); return true; });
   h('plan:save', (e, id, root) => { store.planSave(id, root); return true; });
   h('plan:get', (e, id) => store.planGet(id));
+  h('plan:template', () => (fs.existsSync(PLAN_APP) ? planTemplateData() : null));
+  h('projects:cleanup', (e, name) => store.cleanup(name));
+  h('db:export', async e => {
+    store.flush();
+    const r = await dialog.showSaveDialog(BrowserWindow.fromWebContents(e.sender), {
+      title: 'نسخ قاعدة البيانات', filters: [{ name: 'قاعدة بيانات', extensions: ['db'] }],
+      defaultPath: path.join(app.getPath('documents'), 'Project Tracker - ' + new Date().toISOString().slice(0, 10) + '.db')
+    });
+    if (r.canceled || !r.filePath) return null;
+    fs.copyFileSync(store.file, r.filePath);
+    return r.filePath;
+  });
+  h('db:pick', async e => {
+    const r = await dialog.showOpenDialog(BrowserWindow.fromWebContents(e.sender), {
+      title: 'تحميل قاعدة بيانات', properties: ['openFile'], filters: [{ name: 'قاعدة بيانات', extensions: ['db'] }]
+    });
+    if (r.canceled || !r.filePaths[0]) return null;
+    try { return { file: r.filePaths[0], projects: store.inspect(r.filePaths[0]) }; } catch (err) { return { file: r.filePaths[0], error: true }; }
+  });
+  h('db:load', (e, file, mode) => (mode === 'merge' ? store.merge(file) : (store.restore(file), -1)));
+  h('db:wipe', async e => {
+    store.wipe();
+    try { fs.unlinkSync(path.join(app.getPath('userData'), 'plan-view.html')); } catch (err) { /* none */ }
+    await e.sender.session.clearStorageData({ storages: ['localstorage', 'indexdb', 'cachestorage'] });
+    return true;
+  });
   h('app:kv', (e, key, value) => (value === undefined ? store.kv(key) : (store.kv(key, value), true)));
   h('app:home', () => { win.loadFile(path.join(__dirname, 'renderer', 'home.html')); return true; });
   h('projects:duplicate', (e, id) => store.duplicate(id));
@@ -140,7 +166,6 @@ app.whenReady().then(async () => {
     dialog.showErrorBox(APP_TITLE, 'تعذّر فتح قاعدة البيانات:\n' + store.file + '\n\n' + (err && err.message));
     app.quit(); return;
   }
-  seedPlan();
   handlers();
   createWindow();
 });

@@ -31,10 +31,13 @@
   </section>
   <main id="grid" class="grid" aria-live="polite"></main>
   <footer class="foot">
-    <div class="tools">
+    <div class="tools" aria-label="قاعدة البيانات">
+      <button class="btn sm" data-tool="export">نسخ قاعدة البيانات</button>
+      <button class="btn sm" data-tool="load">تحميل قاعدة بيانات</button>
+      <button class="btn sm" data-act="folder">فتح مجلد قاعدة البيانات</button>
       <button class="btn sm" data-act="backup">نسخة احتياطية الآن</button>
       <button class="btn sm" data-act="restore">استرجاع نسخة احتياطية</button>
-      <button class="btn sm" data-act="folder">فتح مجلد البيانات</button>
+      <button class="btn sm danger" data-tool="reset">إعادة ضبط البرنامج</button>
     </div>
     <p id="dbinfo" class="muted"></p>
     <p class="credit">متابعة المشاريع · تصميم وبرمجة: م. ياسر محمد عبدالجابر · © <span id="yr">2026</span> جميع الحقوق محفوظة <span id="ver"></span></p>

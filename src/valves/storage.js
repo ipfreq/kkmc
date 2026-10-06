@@ -296,7 +296,7 @@ function buildWorkbook(full){
     ws=xSheet(W,'حصر الأعمال','حصر الأعمال – جدول الكميات',bc,{land:1,sub:'الموقف حتى '+fs(asOf)});
     var r0=5;
     boqs.forEach(function(b,i){var rr=r0+i,q=num(b.qty),s=suppliedOf(b.id,asOf),ins=installedOf(b.id,asOf),rt=num(b.rate);
-      var sF=full?F("SUMIFS('"+SH.sup+"'!E:E,'"+SH.sup+"'!C:C,A"+rr+")",s):s,iF=full?F("SUMIFS('"+SH.inst+"'!E:E,'"+SH.inst+"'!C:C,A"+rr+")",ins):ins;
+      var sF=full?F("SUMIFS('"+SH.sup+"'!E:E,'"+SH.sup+"'!C:C,A"+rr+")",s):s,iF=full&&!manualPct(b)?F("SUMIFS('"+SH.inst+"'!E:E,'"+SH.inst+"'!C:C,A"+rr+")",ins):ins;
       xRow(ws,rr,bc,[noVal(b),b.dia===''?null:num(b.dia),b.desc,b.unit,q,sF,iF,F('MAX(0,E'+rr+'-G'+rr+')',Math.max(0,q-ins)),F('IF(E'+rr+'>0,G'+rr+'/E'+rr+',0)',q?ins/q:0)].concat(prices?[rt||null,F('E'+rr+'*J'+rr,q*rt),F('MIN(G'+rr+',E'+rr+')*J'+rr,Math.min(ins,q)*rt)]:[]),i)});
     var rl=r0+boqs.length-1,rt_=rl+1,sum=function(L){return F('SUM('+L+r0+':'+L+rl+')')};
     xTot(ws,rt_,bc,['الإجمالي','','','',sum('E'),sum('F'),sum('G'),sum('H'),F('IF(E'+rt_+'>0,G'+rt_+'/E'+rt_+',0)')].concat(prices?['',sum('K'),sum('L')]:[]));
