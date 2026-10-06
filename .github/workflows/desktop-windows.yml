@@ -37,6 +37,11 @@ jobs:
 
       - name: Build the installer
         working-directory: desktop
+        env:
+          # Code signing: add the certificate (.pfx, base64) and its password as repository
+          # secrets WIN_CSC_LINK and WIN_CSC_KEY_PASSWORD. Without them the build is unsigned.
+          CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
         run: npx electron-builder --win --x64 --publish never
 
       - uses: actions/upload-artifact@v4
