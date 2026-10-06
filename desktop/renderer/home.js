@@ -87,12 +87,10 @@
   function newProject() {
     dialog('<h2>مشروع جديد</h2><label class="f">اسم المشروع<input class="in" name="name" required value="مشروع توريد وتركيب محابس"></label>' +
       '<label class="opt"><input type="radio" name="tpl" value="kkmc" checked><div><b>قالب مشروع المحابس الكامل</b><span>البنود التسعة، الجدول الزمني المعتمد، خطة العمل، فريق العمل والمعدات، الشروط. تعدّل أي شيء بعدها.</span></div></label>' +
-      '<label class="opt"><input type="radio" name="tpl" value="blank"><div><b>مشروع محابس فارغ</b><span>بدون بنود أو جدول زمني، تبدأ تضيفها بنفسك.</span></div></label>' +
-      '<label class="opt"><input type="radio" name="tpl" value="plan"><div><b>خطة عمل وجدول زمني</b><span>نفس برنامج خطط محطات الرفع: مراحل ومهام وجدول Gantt وجدول كميات وتقرير PDF، ويمكن أن يضم أكثر من خطة.</span></div></label>' +
+      '<label class="opt"><input type="radio" name="tpl" value="blank"><div><b>مشروع جديد فارغ (أي نوع أعمال)</b><span>نفس الأقسام: لوحة المتابعة، حصر الأعمال، الجدول الزمني، الأعمال المنفذة، التوريدات، المصاريف، الإيقاف والمدد، خطة العمل، التقرير. بدون بنود، تضيفها بنفسك.</span></div></label>' +
       '<div class="dlg-f"><button type="button" class="btn" data-close>إلغاء</button><button class="btn primary">إنشاء وفتح المشروع</button></div>',
     function (f) {
       var name = f.elements.name.value.trim(), tpl = f.elements.tpl.value;
-      if (tpl === 'plan') { api.create(name, 'plan').then(function (id) { api.openPlan(id); }); return; }
       api.create(name, 'valves').then(function (id) { go(id, '&name=' + encodeURIComponent(name) + (tpl === 'blank' ? '&blank=1' : '')); });
     });
   }
@@ -119,5 +117,41 @@
   $('#q').addEventListener('input', render);
 
   api.info().then(function (i) { $('#dbinfo').textContent = i.dbPath; $('#ver').textContent = '· الإصدار ' + i.version; });
-  load();
+
+  /* One-time move of work plans (lift stations) into projects with the full structure.
+     Each plan inside becomes its own project; the original is kept in the archive. */
+  function projectDocs(st) {
+    var meta = JSON.parse(JSON.stringify(st.meta)); delete meta.updated;
+    var out = { 'project/meta': meta, 'project/report': st.report, 'project/settings': { expCats: st.expCats, v: 1 } };
+    ['boq', 'groups', 'tasks', 'events', 'installs', 'supplies', 'expenses', 'sections', 'team', 'equip', 'rates', 'risks', 'conditions'].forEach(function (c) {
+      (st[c] || []).forEach(function (r, i) { var b = JSON.parse(JSON.stringify(r)); b._o = i; out[c + '/' + r.id] = b; });
+    });
+    return out;
+  }
+  function migratePlans() {
+    return api.kv('plans_moved_v1').then(function (done) {
+      if (done) return false;
+      return api.projects().then(function (all) {
+        var plans = all.filter(function (p) { return p.type === 'plan'; });
+        return plans.reduce(function (chain, p) {
+          return chain.then(function () { return api.planGet(p.id); }).then(function (root) {
+            var inner = root && Array.isArray(root.projects) ? root.projects : [];
+            return inner.reduce(function (c2, plan) {
+              return c2.then(function () {
+                var st = planToValves(plan, DEFAULT_PROJECT());
+                return api.create(st.meta.name, 'valves').then(function (id) {
+                  var docs = projectDocs(st);
+                  return Object.keys(docs).reduce(function (c3, path) { return c3.then(function () { return api.set(id, path, docs[path]); }); }, Promise.resolve());
+                });
+              });
+            }, Promise.resolve()).then(function () { return api.archive(p.id, true); });
+          });
+        }, Promise.resolve()).then(function () { return api.kv('plans_moved_v1', '1'); }).then(function () { return plans.length > 0; });
+      });
+    }).catch(function () { return false; });
+  }
+  migratePlans().then(function (moved) {
+    if (moved) toast('تم نقل خطط محطات الرفع إلى مشاريع بنفس أقسام مشروع المحابس. النسخة الأصلية محفوظة في «المؤرشفة».');
+    load();
+  });
 })();

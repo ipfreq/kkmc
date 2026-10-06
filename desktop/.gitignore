@@ -3,3 +3,5 @@ dist/
 renderer/valves.html
 renderer/fonts.css
 renderer/plan-app.html
+renderer/data.js
+renderer/convert.js

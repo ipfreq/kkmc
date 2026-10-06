@@ -96,6 +96,8 @@ function handlers() {
   });
   h('plan:open', (e, id) => { openPlan(id); return true; });
   h('plan:save', (e, id, root) => { store.planSave(id, root); return true; });
+  h('plan:get', (e, id) => store.planGet(id));
+  h('app:kv', (e, key, value) => (value === undefined ? store.kv(key) : (store.kv(key, value), true)));
   h('app:home', () => { win.loadFile(path.join(__dirname, 'renderer', 'home.html')); return true; });
   h('projects:duplicate', (e, id) => store.duplicate(id));
   h('projects:remove', (e, id) => { store.remove(id); return true; });

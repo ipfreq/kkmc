@@ -96,7 +96,7 @@ function DEFAULT_PROJECT(){
       preparer:'',engineer:'',
       start:'2025-04-22',end:'2026-02-07',
       value:'',vat:15,currency:'ريال',supplyPct:0,
-      weekend:[5],logo:'',updated:''
+      weekend:[5],logo:'',updated:'',kind:'valves',terms:{}
     },
     boq:boq,groups:groups,tasks:tasks,
     events:[],installs:[],supplies:[],expenses:[],

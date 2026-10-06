@@ -23,5 +23,7 @@ contextBridge.exposeInMainWorld('DESKTOP', {
   restore: () => call('app:restore'),
   openPlan: id => call('plan:open', id),
   planSave: (id, root) => call('plan:save', id, root),
-  home: () => call('app:home')
+  home: () => call('app:home'),
+  planGet: id => call('plan:get', id),
+  kv: (key, value) => call('app:kv', key, value)
 });

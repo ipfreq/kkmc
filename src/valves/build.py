@@ -9,8 +9,8 @@ Writes:
 
   python3 src/valves/build.py --desktop desktop/renderer
 also writes the desktop program's project page (desktop/renderer/valves.html,
-fully offline), plan-app.html (the offline lift-stations work-plan app) and
-fonts.css used by its projects home page.
+fully offline), plan-app.html (the offline lift-stations work-plan app), and
+data.js, convert.js and fonts.css used by its projects home page.
 
   python3 src/valves/build.py --page OUT.html ADAPTER.html
 also writes a page-content-only copy for publishing as a hosted page; the
@@ -48,7 +48,7 @@ def app_js():
     if app.count(marker) != 1:
         raise SystemExit('module marker missing in app.js')
     app = app.replace(marker, (HERE / 'storage.js').read_text(encoding='utf-8'))
-    return (HERE / 'data.js').read_text(encoding='utf-8') + '\n' + app
+    return (HERE / 'data.js').read_text(encoding='utf-8') + '\n' + (HERE / 'convert.js').read_text(encoding='utf-8') + '\n' + app
 
 
 def body(title, fonts_html, libs_html, extra=''):
@@ -89,6 +89,8 @@ def main():
                'script-src \'self\' \'unsafe-inline\' \'unsafe-eval\'; style-src \'self\' \'unsafe-inline\'; img-src \'self\' data: blob:; font-src \'self\' data:">')
         (out / 'valves.html').write_text(page(parts['fonts'], parts['lib-h2c'] + parts['lib-jspdf'] + xlsx, csp,
                                               '<script src="desktop-host.js"></script>'), encoding='utf-8')
+        for f in ('data.js', 'convert.js'):
+            (out / f).write_text((HERE / f).read_text(encoding='utf-8'), encoding='utf-8')
         (out / 'plan-app.html').write_text((ROOT / 'offline' / 'projects-plan-offline.html').read_text(encoding='utf-8'), encoding='utf-8')
         (out / 'fonts.css').write_text(re.sub(r'^<style id="fonts">|</style>$', '', parts['fonts']), encoding='utf-8')
         print('%s  %.0f KB' % (out / 'valves.html', (out / 'valves.html').stat().st_size / 1024))

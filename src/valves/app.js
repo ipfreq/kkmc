@@ -67,12 +67,30 @@ function toast(msg){var e=$('#toast');if(!e){e=el('div','toast');e.id='toast';e.
 
 /* ================= lookups ================= */
 function boqById(id){for(var i=0;i<state.boq.length;i++)if(state.boq[i].id===id)return state.boq[i];return null}
-function boqName(id){var b=boqById(id);if(!b)return '—';return b.dia?('قطر '+b.dia+' بوصة'):('بند '+b.no)}
+function boqName(id){var b=boqById(id);if(!b)return '—';if(b.dia)return 'قطر '+b.dia+' بوصة';var d=String(b.desc||'').replace(/\s+/g,' ').trim();return 'بند '+b.no+(d?' – '+(d.length>48?d.slice(0,47)+'…':d):'')}
 function boqShort(id){var b=boqById(id);if(!b)return '—';return b.dia?(b.dia+'"'):('بند '+b.no)}
 function taskById(id){for(var i=0;i<state.tasks.length;i++)if(state.tasks[i].id===id)return state.tasks[i];return null}
 function grpIdx(id){for(var i=0;i<state.groups.length;i++)if(state.groups[i].id===id)return i;return 0}
 function grpColor(id){var g=state.groups[grpIdx(id)];return PCOL[((g&&g.color!=null?g.color:grpIdx(id))%8+8)%8]}
 function grpHex(id){var g=state.groups[grpIdx(id)];return PHEX[((g&&g.color!=null?g.color:grpIdx(id))%8+8)%8]}
+/* wording: valve projects say المحابس/محبس/تركيب, other projects say الأعمال/وحدة/تنفيذ; each can be renamed */
+var TERMS={
+  valves:{itemCol:'القطر',diaCol:'القطر (بوصة)',log:'المحابس المركبة',items:'المحابس',itemsN:'محابس',unit:'محبس',unit2:'محبساً',verb:'تركيب',doneU:'مركب',supU:'موَرَّد'},
+  works:{itemCol:'البند',diaCol:'المقاس',log:'الأعمال المنفذة',items:'الأعمال',itemsN:'أعمال',unit:'وحدة',unit2:'وحدة',verb:'تنفيذ',doneU:'منفذة',supU:'موردة'}
+};
+function TM(k){
+  var base=TERMS[state.meta.kind==='works'?'works':'valves'],t=state.meta.terms||{};
+  if(k==='verbAl')return 'ال'+TM('verb');
+  if((k==='unit'||k==='unit2')&&state.meta.kind==='works'&&!String(t.unit||'').trim())return state.boq.some(function(b){return num(b.rate)>0})?(state.meta.currency||'ريال'):'وحدة';
+  if(k==='unit2'&&t.unit)return t.unit;
+  return String(t[k]||'').trim()||base[k];
+}
+function asProject(o){
+  if(o&&o.state)o=o.state;
+  if(o&&Array.isArray(o.projects)&&o.projects.length&&o.projects[0].phases){if(o.projects.length>1)toast('الملف يحتوي على '+o.projects.length+' خطط، تم استيراد الأولى: '+(o.projects[0].meta||{}).project);o=o.projects[0]}
+  if(o&&Array.isArray(o.phases)&&Array.isArray(o.tasks)&&!o.groups)return planToValves(o,DEFAULT_PROJECT());
+  return o&&o.meta&&o.boq?o:null;
+}
 function taskCol(t){return t.color||grpColor(t.group)}
 function taskHex(t){return t.color||grpHex(t.group)}
 function totQty(){return state.boq.reduce(function(s,b){return s+num(b.qty)},0)}
@@ -165,6 +183,12 @@ function statusOf(t){
 var STL={done:'منجز',late:'متأخر',active:'جارٍ',ns:'لم يبدأ'};
 var STC={done:'ok',late:'bad',active:'a',ns:'n'};
 function overall(to){
+  if(state.meta.kind==='works'){
+    var d0=to==null?todayNum():to,hasR=state.boq.some(function(b){return num(b.rate)>0}),tv=0,ti=0,ts=0,tw=0,ta=0,tp=0;
+    state.boq.forEach(function(b){var q0=num(b.qty),w0=hasR?num(b.rate):1;tv+=q0*w0;ti+=Math.min(installedOf(b.id,to),q0)*w0;ts+=Math.min(suppliedOf(b.id,to),q0)*w0});
+    state.tasks.forEach(function(t){if(t.ms)return;var w1=Math.max(1,parseInt(t.dur,10)||1);tw+=w1;ta+=w1*progOf(t,to);tp+=w1*plannedAt(t,d0)});
+    return {q:tv,inst:ti,sup:ts,act:tw?ta/tw:(tv?ti/tv:0),sp:tv?ts/tv:0,plan:tw?tp/tw:0};
+  }
   var q=totQty(),inst=Math.min(installedAll(to),q||Infinity),sup=Math.min(suppliedAll(to),q||Infinity);
   var d=to==null?todayNum():to,plq=0,pls=0,ins=state.tasks.filter(function(t){return t.link&&t.link!=='supply'&&boqById(t.link)});
   ins.forEach(function(t){var b=boqById(t.link),w=num(b.qty);plq+=w;pls+=w*plannedAt(t,d)});
@@ -184,7 +208,7 @@ function renderBanners(){
   var out=[],td=todayNum();
   state.events.forEach(function(e){if(e.type==='stop'&&e.from&&!e.to&&dnum(e.from)<=td)out.push(['bad','أمر إيقاف سارٍ منذ '+fl(dnum(e.from))+(e.ref?' (رقم '+esc(e.ref)+')':'')+' – مضى عليه '+(td-dnum(e.from)+1)+' يوماً. سجّل تاريخ الاستئناف عند صدوره من تبويب «الإيقاف والمدد».'])});
   var o=overall();
-  if(td>revEnd()&&o.act<1)out.push(['warn','انتهت المدة التعاقدية المعدّلة في '+fl(revEnd())+' ونسبة التركيب '+pct(o.act)+'%. أضف أمر إيقاف أو إضافة مدة إن وُجد.']);
+  if(td>revEnd()&&o.act<1)out.push(['warn','انتهت المدة التعاقدية المعدّلة في '+fl(revEnd())+' ونسبة '+TM('verbAl')+' '+pct(o.act)+'%. أضف أمر إيقاف أو إضافة مدة إن وُجد.']);
   state.boq.forEach(function(b){var i=installedOf(b.id),s=suppliedOf(b.id);if(state.supplies.length&&i>s)out.push(['warn','المركب من '+boqName(b.id)+' ('+qn(i)+') أكبر من الموَرَّد ('+qn(s)+').']);if(num(b.qty)&&i>num(b.qty))out.push(['warn','المركب من '+boqName(b.id)+' ('+qn(i)+') أكبر من الكمية التعاقدية ('+qn(num(b.qty))+').'])});
   $('#banners').innerHTML=out.map(function(b){return '<div class="banner '+(b[0]==='info'?'':b[0])+'"><p>'+b[1]+'</p>'+(b[0]==='info'?'<button class="btn sm" data-act="dismiss-draft">حسناً</button>':'')+'</div>'}).join('');
 }
@@ -192,9 +216,9 @@ function kpiHtml(){
   var o=overall(),td=todayNum(),cs=cStart(),re=revEnd(),dur=re-cs+1,el_=clamp(td-cs+1,0,dur),rem=re-td,v=valueStats(),ex=expTotal(state.expenses),c=esc(state.meta.currency);
   var gap=o.act-o.plan;
   return '<div class="kpis">'+
-  '<div class="kpi"><span class="k">نسبة التركيب الفعلية</span><span class="v">'+pct(o.act)+'%<small>المخطط '+pct(o.plan)+'%</small></span><div class="bar"><i class="pl" style="width:'+pct(o.plan)+'%"></i><i class="ac" style="width:'+pct(o.act)+'%"></i></div><span class="s">'+(o.q?(gap>=-0.005?'<span class="pill ok">مطابق أو متقدم</span>':'<span class="pill bad">متأخر '+pct(-gap)+'%</span>'):'')+'</span></div>'+
-  '<div class="kpi"><span class="k">المحابس المركبة</span><span class="v">'+qn(o.inst)+'<small>من '+qn(o.q)+'</small></span><span class="s">المتبقي '+qn(Math.max(0,o.q-o.inst))+' محبس</span></div>'+
-  '<div class="kpi"><span class="k">المحابس الموردة</span><span class="v">'+qn(o.sup)+'<small>'+pct(o.sp)+'%</small></span><div class="bar"><i class="sup" style="width:'+pct(o.sp)+'%"></i></div></div>'+
+  '<div class="kpi"><span class="k">نسبة '+TM('verbAl')+' الفعلية</span><span class="v">'+pct(o.act)+'%<small>المخطط '+pct(o.plan)+'%</small></span><div class="bar"><i class="pl" style="width:'+pct(o.plan)+'%"></i><i class="ac" style="width:'+pct(o.act)+'%"></i></div><span class="s">'+(o.q?(gap>=-0.005?'<span class="pill ok">مطابق أو متقدم</span>':'<span class="pill bad">متأخر '+pct(-gap)+'%</span>'):'')+'</span></div>'+
+  '<div class="kpi"><span class="k">'+TM('log')+'</span><span class="v">'+qn(o.inst)+'<small>من '+qn(o.q)+'</small></span><span class="s">المتبقي '+qn(Math.max(0,o.q-o.inst))+' '+TM('unit')+'</span></div>'+
+  '<div class="kpi"><span class="k">'+TM('items')+' الموردة</span><span class="v">'+qn(o.sup)+'<small>'+pct(o.sp)+'%</small></span><div class="bar"><i class="sup" style="width:'+pct(o.sp)+'%"></i></div></div>'+
   '<div class="kpi"><span class="k">المدة الزمنية</span><span class="v">'+(td<cs?'لم يبدأ':el_+'<small>من '+dur+' يوم</small>')+'</span><div class="bar"><i class="pl" style="width:'+pct(el_/dur)+'%"></i></div><span class="s">'+(rem>=0?'المتبقي '+rem+' يوماً حتى '+fs(re):'تجاوز النهاية المعدّلة بـ '+(-rem)+' يوماً')+'</span></div>'+
   '<div class="kpi"><span class="k">الإيقاف وإضافة المدد</span><span class="v">+'+addDays()+'<small>يوم</small></span><span class="s">إيقاف '+stopDays()+' · تمديد '+extDays()+' يوم</span></div>'+
   (v.tot?'<div class="kpi"><span class="k">قيمة الأعمال المنفذة</span><span class="v">'+money(v.ex)+'<small>'+c+'</small></span><span class="s">من '+money(v.tot)+' '+c+' قبل الضريبة'+(v.hasRates?'':' (القيمة الإجمالية فقط)')+'</span></div>':'')+
@@ -204,7 +228,7 @@ function kpiHtml(){
 var TABS=[['dash','لوحة المتابعة'],['boq','حصر الأعمال'],['gantt','الجدول الزمني'],['installs','المحابس المركبة'],['supplies','التوريدات'],['expenses','المصاريف'],['events','الإيقاف والمدد'],['plan','خطة العمل'],['report','التقرير / PDF'],['settings','بيانات المشروع']];
 function renderTabs(){
   var cnt={installs:state.installs.length,supplies:state.supplies.length,expenses:state.expenses.length,events:state.events.length};
-  $('#tabs').innerHTML=TABS.map(function(t){return '<button role="tab" aria-selected="'+(ui.tab===t[0])+'" data-act="tab" data-v="'+t[0]+'">'+t[1]+(cnt[t[0]]?'<span class="cnt">'+cnt[t[0]]+'</span>':'')+'</button>'}).join('');
+  $('#tabs').innerHTML=TABS.map(function(t){return '<button role="tab" aria-selected="'+(ui.tab===t[0])+'" data-act="tab" data-v="'+t[0]+'">'+(t[0]==='installs'?esc(TM('log')):t[1])+(cnt[t[0]]?'<span class="cnt">'+cnt[t[0]]+'</span>':'')+'</button>'}).join('');
 }
 
 /* ================= binding helpers ================= */
@@ -223,6 +247,7 @@ function setBound(key,val,elx){
     if(c==='report'&&f.indexOf('secs.')===0){o.secs[f.slice(5)]=val;return}
     if(c==='report'&&f.indexOf('sign.')===0){var q=f.split('.');o.sign[+q[1]][q[2]]=val;return}
     if(c==='meta'&&f==='weekend'){return}
+    if(c==='meta'&&f.indexOf('terms.')===0){o.terms=Object.assign({},o.terms);o.terms[f.slice(6)]=val;return}
     o[f]=val;
     if(c==='expenses'&&(f==='qty'||f==='price')){var a=num(o.qty)*num(o.price);if(num(o.qty)&&num(o.price))o.amount=Math.round(a*100)/100}
     if(c==='tasks'&&f==='dur'){o.dur=Math.max(1,parseInt(val,10)||1)}
@@ -237,8 +262,8 @@ document.addEventListener('change',function(e){
 /* ================= dashboard ================= */
 function recent(){
   var it=[];
-  state.installs.forEach(function(r){it.push([dnum(r.date),'تركيب '+qn(num(r.qty))+' محبس '+boqName(r.boq)+(r.loc?' – '+r.loc:'')])});
-  state.supplies.forEach(function(r){it.push([dnum(r.date),'توريد '+qn(num(r.qty))+' محبس '+boqName(r.boq)+(r.supplier?' من '+r.supplier:'')])});
+  state.installs.forEach(function(r){it.push([dnum(r.date),TM('verb')+' '+qn(num(r.qty))+' '+TM('unit')+' '+boqName(r.boq)+(r.loc?' – '+r.loc:'')])});
+  state.supplies.forEach(function(r){it.push([dnum(r.date),'توريد '+qn(num(r.qty))+' '+TM('unit')+' '+boqName(r.boq)+(r.supplier?' من '+r.supplier:'')])});
   state.expenses.forEach(function(r){it.push([dnum(r.date),'مصروف: '+(r.desc||r.cat)+' – '+money(expTot(r))+' '+state.meta.currency])});
   state.events.forEach(function(e){it.push([dnum(e.type==='ext'?e.date:e.from),EVT[e.type]+(e.ref?' رقم '+e.ref:'')+' – '+evDays(e)+' يوم'])});
   return it.filter(function(x){return !isNaN(x[0])}).sort(function(a,b){return b[0]-a[0]}).slice(0,10);
@@ -251,7 +276,7 @@ function renderDash(p){
   var rc=recent();
   p.innerHTML=kpiHtml()+
   '<div class="grid2">'+
-   '<div class="card"><div class="card-h"><h2>التقدم حسب القطر</h2><div class="legend"><span style="--c:color-mix(in srgb,var(--c3) 40%,transparent)"><i></i>موَرَّد</span><span style="--c:var(--accent)"><i></i>مركب</span></div></div><div class="dia">'+dia+'</div></div>'+
+   '<div class="card"><div class="card-h"><h2>التقدم حسب '+TM('itemCol')+'</h2><div class="legend"><span style="--c:color-mix(in srgb,var(--c3) 40%,transparent)"><i></i>موَرَّد</span><span style="--c:var(--accent)"><i></i>مركب</span></div></div><div class="dia">'+dia+'</div></div>'+
    '<div class="card"><h2>المواعيد التعاقدية</h2><dl class="facts">'+
     '<dt>تاريخ البدء</dt><dd>'+fl(cStart())+'</dd><dt>تاريخ الانتهاء الأصلي</dt><dd>'+fl(cEnd())+' ('+(cEnd()-cStart()+1)+' يوماً)</dd>'+
     '<dt>أيام الإيقاف</dt><dd>'+stopDays()+' يوماً</dd><dt>إضافة مدة</dt><dd>'+extDays()+' يوماً</dd>'+
@@ -261,8 +286,8 @@ function renderDash(p){
    '</dl></div>'+
   '</div>'+
   '<div class="grid2">'+
-   '<div class="card"><div class="card-h"><h2>تسجيل سريع</h2></div><div class="toolbar"><button class="btn primary" data-act="tab" data-v="installs">+ تركيب محابس</button><button class="btn" data-act="tab" data-v="supplies">+ توريد</button><button class="btn" data-act="tab" data-v="expenses">+ مصروف</button><button class="btn" data-act="tab" data-v="events">+ أمر إيقاف / إضافة مدة</button></div><p class="hint">كل البيانات قابلة للتعديل، وتُحفظ تلقائياً في هذا المتصفح. للاحتفاظ بنسخة دائمة استخدم «حفظ نسخة HTML محدّثة» أو «تصدير ملف المشروع» من تبويب بيانات المشروع.</p></div>'+
-   '<div class="card"><h2>آخر الأحداث</h2>'+(rc.length?'<div class="tl">'+rc.map(function(x){return '<div><time>'+fs(x[0])+'</time><span>'+esc(x[1])+'</span></div>'}).join('')+'</div>':'<p class="hint">لا توجد سجلات بعد. ابدأ بتسجيل التوريدات وتركيب المحابس.</p>')+'</div>'+
+   '<div class="card"><div class="card-h"><h2>تسجيل سريع</h2></div><div class="toolbar"><button class="btn primary" data-act="tab" data-v="installs">+ '+TM('verb')+' '+TM('itemsN')+'</button><button class="btn" data-act="tab" data-v="supplies">+ توريد</button><button class="btn" data-act="tab" data-v="expenses">+ مصروف</button><button class="btn" data-act="tab" data-v="events">+ أمر إيقاف / إضافة مدة</button></div><p class="hint">كل البيانات قابلة للتعديل، وتُحفظ تلقائياً في هذا المتصفح. للاحتفاظ بنسخة دائمة استخدم «حفظ نسخة HTML محدّثة» أو «تصدير ملف المشروع» من تبويب بيانات المشروع.</p></div>'+
+   '<div class="card"><h2>آخر الأحداث</h2>'+(rc.length?'<div class="tl">'+rc.map(function(x){return '<div><time>'+fs(x[0])+'</time><span>'+esc(x[1])+'</span></div>'}).join('')+'</div>':'<p class="hint">لا توجد سجلات بعد. ابدأ بتسجيل التوريدات و'+TM('verb')+' '+TM('items')+'.</p>')+'</div>'+
   '</div>';
 }
 
@@ -274,8 +299,8 @@ function renderBoq(p){
     return '<tr class="'+(b.hide?'off':'')+'"><td class="n">'+inp('boq',b,'no','text')+'</td><td class="n">'+inp('boq',b,'dia','number')+'</td><td style="min-width:300px">'+txa('boq',b,'desc')+'</td><td class="n">'+inp('boq',b,'unit','text')+'</td><td class="n">'+inp('boq',b,'qty','number')+'</td><td class="n">'+inp('boq',b,'rate','number',' placeholder="—"')+'</td><td class="n">'+(r?money(q*r):'—')+'</td><td class="n">'+qn(s)+'</td><td class="n">'+qn(i)+'</td><td class="n">'+qn(Math.max(0,q-i))+'</td><td><div class="mini"><div class="bar"><i class="sup" style="width:'+pct(q?Math.min(1,s/q):0)+'%"></i><i class="ac" style="width:'+pct(q?Math.min(1,i/q):0)+'%"></i></div><b>'+pct(q?i/q:0)+'%</b></div></td><td>'+rowActs('boq',b)+'</td></tr>';
   }).join('');
   p.innerHTML='<div class="card"><div class="card-h"><h2>حصر الأعمال – جدول الكميات</h2><div class="toolbar"><button class="btn" data-act="add-boq">+ بند جديد</button><button class="btn" data-act="csv" data-v="boq">تصدير Excel (CSV)</button></div></div>'+
-  '<p class="hint">الكمية الموَرَّدة والمركبة تُحسب تلقائياً من سجلي التوريدات والمحابس المركبة. أدخل سعر الوحدة لحساب قيمة العقد وقيمة الأعمال المنفذة، أو اكتب القيمة الإجمالية من تبويب بيانات المشروع.</p>'+
-  '<div class="tw"><table class="t"><thead><tr><th class="n">البند</th><th class="n">القطر (بوصة)</th><th>الوصف</th><th class="n">الوحدة</th><th class="n">الكمية</th><th class="n">سعر الوحدة ('+c+')</th><th class="n">الإجمالي</th><th class="n">الموَرَّد</th><th class="n">المركب</th><th class="n">المتبقي</th><th>الإنجاز</th><th></th></tr></thead><tbody>'+rows+'</tbody>'+
+  '<p class="hint">الكمية الموَرَّدة والمركبة تُحسب تلقائياً من سجلي التوريدات و'+TM('log')+'. أدخل سعر الوحدة لحساب قيمة العقد وقيمة الأعمال المنفذة، أو اكتب القيمة الإجمالية من تبويب بيانات المشروع.</p>'+
+  '<div class="tw"><table class="t"><thead><tr><th class="n">البند</th><th class="n">'+TM('diaCol')+'</th><th>الوصف</th><th class="n">الوحدة</th><th class="n">الكمية</th><th class="n">سعر الوحدة ('+c+')</th><th class="n">الإجمالي</th><th class="n">الموَرَّد</th><th class="n">المركب</th><th class="n">المتبقي</th><th>الإنجاز</th><th></th></tr></thead><tbody>'+rows+'</tbody>'+
   '<tfoot><tr><td colspan="4">الإجمالي</td><td class="n">'+qn(T.q)+'</td><td></td><td class="n">'+(T.val?money(T.val):'—')+'</td><td class="n">'+qn(T.s)+'</td><td class="n">'+qn(T.i)+'</td><td class="n">'+qn(Math.max(0,T.q-T.i))+'</td><td class="n">'+pct(T.q?T.i/T.q:0)+'%</td><td></td></tr></tfoot></table></div>'+
   (v.tot?'<dl class="facts"><dt>قيمة العقد قبل الضريبة</dt><dd>'+money(v.tot)+' '+c+'</dd><dt>ضريبة القيمة المضافة ('+num(state.meta.vat)+'%)</dt><dd>'+money(v.tot*v.vat)+' '+c+'</dd><dt>الإجمالي شامل الضريبة</dt><dd><b>'+money(v.totV)+' '+c+'</b></dd>'+(v.hasRates?'<dt>قيمة الأعمال المنفذة</dt><dd>'+money(v.ex)+' '+c+' ('+pct(v.tot?v.ex/v.tot:0)+'%)</dd>':'')+'</dl>':'')+
   '</div>';
@@ -291,7 +316,7 @@ function filt(c,list){
 function filterBar(c,withBoq,withCat){
   var f=ui.f[c]||{};
   return '<div class="toolbar"><label class="f"><span>من تاريخ</span><input class="in" type="date" data-f="'+c+'|from" value="'+esc(f.from||'')+'"></label><label class="f"><span>إلى تاريخ</span><input class="in" type="date" data-f="'+c+'|to" value="'+esc(f.to||'')+'"></label>'+
-  (withBoq?'<label class="f"><span>القطر</span><select class="in" data-f="'+c+'|boq"><option value="">الكل</option>'+state.boq.map(function(b){return '<option value="'+b.id+'"'+(f.boq===b.id?' selected':'')+'>'+esc(boqName(b.id))+'</option>'}).join('')+'</select></label>':'')+
+  (withBoq?'<label class="f"><span>'+TM('itemCol')+'</span><select class="in" data-f="'+c+'|boq"><option value="">الكل</option>'+state.boq.map(function(b){return '<option value="'+b.id+'"'+(f.boq===b.id?' selected':'')+'>'+esc(boqName(b.id))+'</option>'}).join('')+'</select></label>':'')+
   (withCat?'<label class="f"><span>التصنيف</span><select class="in" data-f="'+c+'|cat"><option value="">الكل</option>'+state.expCats.map(function(x){return '<option'+(f.cat===x?' selected':'')+'>'+esc(x)+'</option>'}).join('')+'</select></label>':'')+
   '<label class="f grow"><span>بحث</span><input class="in" type="search" data-f="'+c+'|q" value="'+esc(f.q||'')+'" placeholder="موقع، رقم، ملاحظة…"></label><span class="grow"></span><button class="btn sm" data-act="clear-f" data-c="'+c+'">مسح الفلتر</button><button class="btn sm" data-act="csv" data-v="'+c+'">تصدير Excel (CSV)</button></div>';
 }
@@ -299,8 +324,8 @@ document.addEventListener('input',function(e){var k=e.target.getAttribute&&e.tar
 function addForm(c){
   var d=todayIso(),b0=(ui.last&&ui.last[c+'boq'])||(state.boq[0]||{}).id;
   var bo=state.boq.map(function(b){return '<option value="'+b.id+'"'+(b.id===b0?' selected':'')+'>'+esc(boqName(b.id))+'</option>'}).join('');
-  if(c==='installs')return '<form class="addform" data-add="installs"><label class="f"><span>تاريخ التركيب</span><input type="date" name="date" value="'+d+'" required></label><label class="f"><span>القطر / البند</span><select name="boq">'+bo+'</select></label><label class="f"><span>العدد</span><input type="number" name="qty" value="1" min="0" step="any" required></label><label class="f w2"><span>الموقع (الحي / الشارع)</span><input name="loc" list="loc-list"></label><label class="f"><span>الرقم التسلسلي</span><input name="serial"></label><label class="f"><span>اختبار الضغط</span><select name="test">'+TESTS.map(function(x){return '<option>'+x+'</option>'}).join('')+'</select></label><label class="f"><span>مدة انقطاع المياه (ساعة)</span><input type="number" name="shut" min="0" step="any"></label><label class="f"><span>الفريق</span><input name="team" list="team-list"></label><label class="f w2"><span>ملاحظات</span><input name="notes"></label><div class="go"><button class="btn primary" type="submit">+ إضافة</button></div></form>';
-  if(c==='supplies')return '<form class="addform" data-add="supplies"><label class="f"><span>تاريخ التوريد</span><input type="date" name="date" value="'+d+'" required></label><label class="f"><span>القطر / البند</span><select name="boq">'+bo+'</select></label><label class="f"><span>العدد</span><input type="number" name="qty" value="1" min="0" step="any" required></label><label class="f"><span>المورد</span><input name="supplier" list="sup-list"></label><label class="f"><span>رقم سند الاستلام / الفاتورة</span><input name="ref"></label><label class="f w2"><span>ملاحظات</span><input name="notes"></label><div class="go"><button class="btn primary" type="submit">+ إضافة</button></div></form>';
+  if(c==='installs')return '<form class="addform" data-add="installs"><label class="f"><span>تاريخ '+TM('verbAl')+'</span><input type="date" name="date" value="'+d+'" required></label><label class="f"><span>'+(TM('itemCol')==='القطر'?'القطر / البند':TM('itemCol'))+'</span><select name="boq">'+bo+'</select></label><label class="f"><span>العدد</span><input type="number" name="qty" value="1" min="0" step="any" required></label><label class="f w2"><span>الموقع (الحي / الشارع)</span><input name="loc" list="loc-list"></label><label class="f"><span>الرقم التسلسلي</span><input name="serial"></label><label class="f"><span>اختبار الضغط</span><select name="test">'+TESTS.map(function(x){return '<option>'+x+'</option>'}).join('')+'</select></label><label class="f"><span>مدة انقطاع المياه (ساعة)</span><input type="number" name="shut" min="0" step="any"></label><label class="f"><span>الفريق</span><input name="team" list="team-list"></label><label class="f w2"><span>ملاحظات</span><input name="notes"></label><div class="go"><button class="btn primary" type="submit">+ إضافة</button></div></form>';
+  if(c==='supplies')return '<form class="addform" data-add="supplies"><label class="f"><span>تاريخ التوريد</span><input type="date" name="date" value="'+d+'" required></label><label class="f"><span>'+(TM('itemCol')==='القطر'?'القطر / البند':TM('itemCol'))+'</span><select name="boq">'+bo+'</select></label><label class="f"><span>العدد</span><input type="number" name="qty" value="1" min="0" step="any" required></label><label class="f"><span>المورد</span><input name="supplier" list="sup-list"></label><label class="f"><span>رقم سند الاستلام / الفاتورة</span><input name="ref"></label><label class="f w2"><span>ملاحظات</span><input name="notes"></label><div class="go"><button class="btn primary" type="submit">+ إضافة</button></div></form>';
   return '<form class="addform" data-add="expenses"><label class="f"><span>التاريخ</span><input type="date" name="date" value="'+d+'" required></label><label class="f"><span>التصنيف</span><select name="cat">'+state.expCats.map(function(x){return '<option'+(ui.last&&ui.last.cat===x?' selected':'')+'>'+esc(x)+'</option>'}).join('')+'</select></label><label class="f w2"><span>البيان (مثال: شراء مسامير 3/4)</span><input name="desc" required></label><label class="f"><span>الكمية</span><input type="number" name="qty" min="0" step="any"></label><label class="f"><span>سعر الوحدة</span><input type="number" name="price" min="0" step="any"></label><label class="f"><span>المبلغ قبل الضريبة ('+esc(state.meta.currency)+')</span><input type="number" name="amount" min="0" step="any"></label><label class="f"><span>الضريبة %</span><input type="number" name="vat" min="0" step="any" value="'+esc(ui.last&&ui.last.vat!=null?ui.last.vat:num(state.meta.vat))+'"></label><div class="f exp-live"><span>الإجمالي شامل الضريبة</span><output id="exp-live">—</output></div><label class="f"><span>المورد / الجهة</span><input name="vendor" list="ven-list"></label><label class="f"><span>رقم الفاتورة</span><input name="ref"></label><div class="go"><button class="btn primary" type="submit">+ إضافة</button></div></form>';
 }
 function dl(id,vals){var u={};vals.forEach(function(v){if(v)u[v]=1});return '<datalist id="'+id+'">'+Object.keys(u).map(function(v){return '<option value="'+esc(v)+'">'}).join('')+'</datalist>'}
@@ -319,13 +344,13 @@ document.addEventListener('submit',function(e){
   if((c==='installs'||c==='supplies')&&!num(o.qty)){toast('اكتب العدد');return}
   ui.last=ui.last||{};if(o.boq)ui.last[c+'boq']=o.boq;if(o.cat)ui.last.cat=o.cat;if(c==='expenses')ui.last.vat=o.vat;
   mutate(function(){state[c].push(o)});
-  toast(c==='installs'?'تم تسجيل تركيب '+qn(num(o.qty))+' محبس '+boqName(o.boq):c==='supplies'?'تم تسجيل التوريد':'تم تسجيل المصروف');
+  toast(c==='installs'?'تم تسجيل '+TM('verb')+' '+qn(num(o.qty))+' '+TM('unit')+' '+boqName(o.boq):c==='supplies'?'تم تسجيل التوريد':'تم تسجيل المصروف');
 });
 function renderInstalls(p){
   var list=filt('installs',state.installs),tot=list.reduce(function(s,r){return s+num(r.qty)},0);
   var rows=list.map(function(r){return '<tr class="'+(r.hide?'off':'')+'"><td>'+inp('installs',r,'date','date')+'</td><td>'+boqSel('installs',r,'boq')+'</td><td class="n">'+inp('installs',r,'qty','number')+'</td><td style="min-width:170px">'+inp('installs',r,'loc','text',' list="loc-list"')+'</td><td>'+inp('installs',r,'serial','text')+'</td><td>'+sel('installs',r,'test',TESTS)+'</td><td class="n">'+inp('installs',r,'shut','number')+'</td><td>'+inp('installs',r,'team','text',' list="team-list"')+'</td><td style="min-width:160px">'+txa('installs',r,'notes')+'</td><td>'+rowActs('installs',r)+'</td></tr>'}).join('');
-  p.innerHTML='<div class="card"><div class="card-h"><h2>سجل المحابس المركبة</h2><span class="pill a">'+qn(installedAll())+' محبس مركب من '+qn(totQty())+'</span></div>'+addForm('installs')+filterBar('installs',true)+
-  (list.length?'<div class="tw"><table class="t"><thead><tr><th>التاريخ</th><th>القطر</th><th class="n">العدد</th><th>الموقع</th><th>الرقم التسلسلي</th><th>اختبار الضغط</th><th class="n">انقطاع (س)</th><th>الفريق</th><th>ملاحظات</th><th></th></tr></thead><tbody>'+rows+'</tbody><tfoot><tr><td colspan="2">الإجمالي ('+list.length+' سجل)</td><td class="n">'+qn(tot)+'</td><td colspan="7"></td></tr></tfoot></table></div>':'<div class="empty">لا توجد سجلات تركيب'+(state.installs.length?' مطابقة للفلتر':'')+'. أضف أول سجل من النموذج أعلاه.</div>')+
+  p.innerHTML='<div class="card"><div class="card-h"><h2>سجل '+TM('log')+'</h2><span class="pill a">'+qn(installedAll())+' '+TM('unit')+' '+TM('doneU')+' من '+qn(totQty())+'</span></div>'+addForm('installs')+filterBar('installs',true)+
+  (list.length?'<div class="tw"><table class="t"><thead><tr><th>التاريخ</th><th>'+TM('itemCol')+'</th><th class="n">العدد</th><th>الموقع</th><th>الرقم التسلسلي</th><th>اختبار الضغط</th><th class="n">انقطاع (س)</th><th>الفريق</th><th>ملاحظات</th><th></th></tr></thead><tbody>'+rows+'</tbody><tfoot><tr><td colspan="2">الإجمالي ('+list.length+' سجل)</td><td class="n">'+qn(tot)+'</td><td colspan="7"></td></tr></tfoot></table></div>':'<div class="empty">لا توجد سجلات '+TM('verb')+''+(state.installs.length?' مطابقة للفلتر':'')+'. أضف أول سجل من النموذج أعلاه.</div>')+
   '<p class="hint">👁 / 🚫 لإخفاء سجل من التقرير المطبوع فقط (يبقى محسوباً في نسب الإنجاز).</p></div>'+
   dl('loc-list',state.installs.map(function(r){return r.loc}))+dl('team-list',state.installs.map(function(r){return r.team}));
 }
@@ -333,9 +358,9 @@ function renderSupplies(p){
   var list=filt('supplies',state.supplies),tot=list.reduce(function(s,r){return s+num(r.qty)},0);
   var rows=list.map(function(r){return '<tr class="'+(r.hide?'off':'')+'"><td>'+inp('supplies',r,'date','date')+'</td><td>'+boqSel('supplies',r,'boq')+'</td><td class="n">'+inp('supplies',r,'qty','number')+'</td><td style="min-width:150px">'+inp('supplies',r,'supplier','text',' list="sup-list"')+'</td><td>'+inp('supplies',r,'ref','text')+'</td><td style="min-width:180px">'+txa('supplies',r,'notes')+'</td><td>'+rowActs('supplies',r)+'</td></tr>'}).join('');
   var sum=state.boq.map(function(b){var s=suppliedOf(b.id),q=num(b.qty);return '<tr><td>'+esc(boqName(b.id))+'</td><td class="n">'+qn(q)+'</td><td class="n">'+qn(s)+'</td><td class="n">'+qn(Math.max(0,q-s))+'</td><td><div class="mini"><div class="bar"><i class="sup" style="width:'+pct(q?Math.min(1,s/q):0)+'%"></i></div><b>'+pct(q?s/q:0)+'%</b></div></td></tr>'}).join('');
-  p.innerHTML='<div class="grid2" style="grid-template-columns:minmax(0,2fr) minmax(280px,1fr)"><div class="card"><div class="card-h"><h2>سجل التوريدات</h2><span class="pill a">'+qn(suppliedAll())+' محبس موَرَّد</span></div>'+addForm('supplies')+filterBar('supplies',true)+
-  (list.length?'<div class="tw"><table class="t"><thead><tr><th>التاريخ</th><th>القطر</th><th class="n">العدد</th><th>المورد</th><th>رقم السند</th><th>ملاحظات</th><th></th></tr></thead><tbody>'+rows+'</tbody><tfoot><tr><td colspan="2">الإجمالي</td><td class="n">'+qn(tot)+'</td><td colspan="4"></td></tr></tfoot></table></div>':'<div class="empty">لا توجد توريدات مسجلة.</div>')+'</div>'+
-  '<div class="card"><h2>موقف التوريد</h2><div class="tw"><table class="t"><thead><tr><th>القطر</th><th class="n">المطلوب</th><th class="n">الموَرَّد</th><th class="n">المتبقي</th><th>%</th></tr></thead><tbody>'+sum+'</tbody></table></div></div></div>'+
+  p.innerHTML='<div class="grid2" style="grid-template-columns:minmax(0,2fr) minmax(280px,1fr)"><div class="card"><div class="card-h"><h2>سجل التوريدات</h2><span class="pill a">'+qn(suppliedAll())+' '+TM('unit')+' '+TM('supU')+'</span></div>'+addForm('supplies')+filterBar('supplies',true)+
+  (list.length?'<div class="tw"><table class="t"><thead><tr><th>التاريخ</th><th>'+TM('itemCol')+'</th><th class="n">العدد</th><th>المورد</th><th>رقم السند</th><th>ملاحظات</th><th></th></tr></thead><tbody>'+rows+'</tbody><tfoot><tr><td colspan="2">الإجمالي</td><td class="n">'+qn(tot)+'</td><td colspan="4"></td></tr></tfoot></table></div>':'<div class="empty">لا توجد توريدات مسجلة.</div>')+'</div>'+
+  '<div class="card"><h2>موقف التوريد</h2><div class="tw"><table class="t"><thead><tr><th>'+TM('itemCol')+'</th><th class="n">المطلوب</th><th class="n">الموَرَّد</th><th class="n">المتبقي</th><th>%</th></tr></thead><tbody>'+sum+'</tbody></table></div></div></div>'+
   dl('sup-list',state.supplies.map(function(r){return r.supplier}));
 }
 function renderExpenses(p){
@@ -419,7 +444,7 @@ function renderGantt(p){
   '<button class="btn" data-act="add-task">+ مهمة</button><button class="btn" data-act="add-grp">+ مجموعة</button><button class="btn" data-act="baseline">حفظ خط الأساس</button><button class="btn" data-act="csv" data-v="tasks">تصدير (CSV)</button><span class="grow"></span>'+
   '<div class="legend"><span style="--c:var(--c5)"><i></i>المخطط (الإنجاز داكن)</span><span style="--c:var(--muted)"><i style="height:3px"></i>خط الأساس</span><span style="--c:var(--ok)"><i style="height:3px"></i>الفعلي</span><span style="--c:var(--stop)"><i style="background:repeating-linear-gradient(-45deg,var(--bad) 0 2px,transparent 2px 4px)"></i>إيقاف</span><span style="--c:var(--bad)"><i style="width:2px"></i>اليوم</span></div></div>'+
   '<div class="gantt" id="gwrap"><div class="g" style="width:calc(var(--side) + '+W+'px)"><div class="g-head"><div class="side"><span>الرمز</span><span>المهمة</span><span class="hm">المدة</span><span class="hm">البداية</span><span class="hm">النهاية</span><span>%</span></div><div class="time-h" style="width:'+W+'px"><div class="tier t1">'+t1+'</div><div class="tier t2">'+t2+'</div></div></div><div class="overlay" style="width:'+W+'px">'+ov+'</div>'+rows+'</div></div>'+
-  '<p class="hint">المدة بأيام العمل (العطلة الأسبوعية: '+state.meta.weekend.map(function(x){return DOWS[x]}).join('، ')+'). اضغط على أي مهمة لتعديلها. مهام التركيب مرتبطة بسجل المحابس المركبة، ومهمة التوريد مرتبطة بسجل التوريدات، فتتحدث نسبها تلقائياً. أوامر الإيقاف تؤخر المهام تلقائياً.</p>';
+  '<p class="hint">المدة بأيام العمل (العطلة الأسبوعية: '+state.meta.weekend.map(function(x){return DOWS[x]}).join('، ')+'). اضغط على أي مهمة لتعديلها. مهام '+TM('verbAl')+' مرتبطة بسجل '+TM('log')+'، ومهمة التوريد مرتبطة بسجل التوريدات، فتتحدث نسبها تلقائياً. أوامر الإيقاف تؤخر المهام تلقائياً.</p>';
   var gw=$('#gwrap');
   if(ui.gscroll==null){var open=state.tasks.filter(function(t){return !t.ms&&progOf(t)<1}).map(tS),anchor=open.length?Math.min.apply(null,open):Math.min(td,projEnd());anchor=Math.max(d0,Math.min(anchor,td)-14);gw.scrollLeft=-Math.max(0,X(anchor))}else gw.scrollLeft=ui.gscroll;
   gw.addEventListener('scroll',function(){ui.gscroll=gw.scrollLeft});
@@ -435,7 +460,7 @@ function predRow(p,excl){return '<div class="pred"><select class="in" name="pid"
 function openTask(id){
   var t=taskById(id),fresh=!t;
   if(fresh)t={id:uid('t'),code:'A'+(1000+state.tasks.length*10+10),name:'',group:(state.groups[state.groups.length-1]||{}).id,dur:5,ms:false,preds:[],nb:'',link:'',prog:0,as:'',af:'',notes:''};
-  var a=actualOf(t),linkOpts='<option value="">بدون (نسبة يدوية)</option><option value="supply"'+(t.link==='supply'?' selected':'')+'>سجل التوريدات (كل المحابس)</option>'+state.boq.map(function(b){return '<option value="'+b.id+'"'+(t.link===b.id?' selected':'')+'>تركيب '+esc(boqName(b.id))+'</option>'}).join('');
+  var a=actualOf(t),linkOpts='<option value="">بدون (نسبة يدوية)</option><option value="supply"'+(t.link==='supply'?' selected':'')+'>سجل التوريدات (كل البنود)</option>'+state.boq.map(function(b){return '<option value="'+b.id+'"'+(t.link===b.id?' selected':'')+'>'+TM('verb')+' '+esc(boqName(b.id))+'</option>'}).join('');
   openDlg('<div class="dlg-h"><h2>'+(fresh?'مهمة جديدة':'تعديل مهمة')+'</h2><button type="button" class="btn icon ghost" data-act="close-dlg" aria-label="إغلاق">✕</button></div>'+
   '<div class="fields"><label class="f"><span>الرمز</span><input name="code" value="'+esc(t.code)+'"></label><label class="f" style="grid-column:span 2"><span>اسم المهمة</span><input name="name" value="'+esc(t.name)+'" required></label>'+
   '<label class="f"><span>المجموعة</span><select name="group">'+state.groups.map(function(g){return '<option value="'+g.id+'"'+(g.id===t.group?' selected':'')+'>'+esc(g.name)+'</option>'}).join('')+'</select></label>'+
@@ -479,8 +504,8 @@ function renderPlan(p){
   '<div class="panel"><div class="card-h"><h2>خطة العمل وأسلوب التنفيذ</h2><button class="btn" data-act="add-sec">+ قسم جديد</button></div>'+secs+'</div>'+
   '<div class="panel">'+
    '<div class="card"><div class="card-h"><h3>معدلات الإنتاج وتوزيع الفرق</h3><button class="btn sm" data-act="add-row" data-c="rates">+ صف</button></div>'+
-    planTable('rates',[['القطر',function(r){return boqSel('rates',r,'boq')}],['المجموعات','crews',1],['أفراد/مجموعة','per',1],['المستهدف اليومي/مجموعة','daily',1],['الإجمالي اليومي',function(r){return qn(num(r.crews)*num(r.daily))},1],['الكمية',function(r){var b=boqById(r.boq);return b?qn(num(b.qty)):'—'},1],['المدة (يوم)',function(r){return '<b>'+rateDur(r)+'</b>'},1]],state.rates,'<tfoot><tr><td colspan="6">إجمالي أيام العمل الفعلية</td><td class="n">'+rd+'</td><td></td></tr></tfoot>')+
-    '<p class="hint">المدة = الكمية ÷ (عدد المجموعات × المستهدف اليومي). يمكنك تطبيقها على مهام التركيب في الجدول الزمني وترتيب التنفيذ.</p><div class="toolbar"><button class="btn sm" data-act="apply-rates">تطبيق المدد على الجدول</button><button class="btn sm" data-act="rechain" data-v="1">ترتيب: من الأصغر للأكبر</button><button class="btn sm" data-act="rechain" data-v="-1">ترتيب: من الأكبر للأصغر</button></div></div>'+
+    planTable('rates',[[TM('itemCol'),function(r){return boqSel('rates',r,'boq')}],['المجموعات','crews',1],['أفراد/مجموعة','per',1],['المستهدف اليومي/مجموعة','daily',1],['الإجمالي اليومي',function(r){return qn(num(r.crews)*num(r.daily))},1],['الكمية',function(r){var b=boqById(r.boq);return b?qn(num(b.qty)):'—'},1],['المدة (يوم)',function(r){return '<b>'+rateDur(r)+'</b>'},1]],state.rates,'<tfoot><tr><td colspan="6">إجمالي أيام العمل الفعلية</td><td class="n">'+rd+'</td><td></td></tr></tfoot>')+
+    '<p class="hint">المدة = الكمية ÷ (عدد المجموعات × المستهدف اليومي). يمكنك تطبيقها على مهام '+TM('verbAl')+' في الجدول الزمني وترتيب التنفيذ.</p><div class="toolbar"><button class="btn sm" data-act="apply-rates">تطبيق المدد على الجدول</button><button class="btn sm" data-act="rechain" data-v="1">ترتيب: من الأصغر للأكبر</button><button class="btn sm" data-act="rechain" data-v="-1">ترتيب: من الأكبر للأصغر</button></div></div>'+
    '<div class="card"><div class="card-h"><h3>فريق العمل</h3><button class="btn sm" data-act="add-row" data-c="team">+ وظيفة</button></div>'+planTable('team',[['الوظيفة','role'],['سنوات الخبرة','exp',1],['العدد','count',1]],state.team,'<tfoot><tr><td colspan="2">الإجمالي</td><td class="n">'+qn(tc)+'</td><td></td></tr></tfoot>')+'</div>'+
    '<div class="card"><div class="card-h"><h3>المعدات والأدوات</h3><button class="btn sm" data-act="add-row" data-c="equip">+ معدة</button></div>'+planTable('equip',[['المعدة','name'],['العدد','count',1],['ملاحظات','notes']],state.equip,'<tfoot><tr><td>الإجمالي</td><td class="n">'+qn(ec)+'</td><td colspan="2"></td></tr></tfoot>')+'</div>'+
   '</div></div>'+
@@ -501,7 +526,7 @@ function rechain(dir){
     var before=state.tasks.slice(0,pos).filter(function(t){return !set[t.id]}),after=others.filter(function(t){return before.indexOf(t)<0});
     state.tasks=before.concat(sorted,after);
   });
-  toast(dir>0?'تم ترتيب التركيب من الأصغر للأكبر':'تم ترتيب التركيب من الأكبر للأصغر');
+  toast(dir>0?'تم ترتيب '+TM('verbAl')+' من الأصغر للأكبر':'تم ترتيب '+TM('verbAl')+' من الأكبر للأصغر');
 }
 
 /* ================= settings ================= */
@@ -509,24 +534,26 @@ function fld(c,f,label,type,extra){var o=coll(c);return '<label class="f'+(extra
 function renderSettings(p){
   var m=state.meta;
   p.innerHTML='<div class="card"><h2>بيانات المشروع</h2><div class="fields">'+fld('meta','name','اسم المشروع','text',{wide:1})+fld('meta','short','الاسم المختصر (لترويسة التقرير)')+fld('meta','client','الجهة المالكة')+fld('meta','po','رقم أمر الشراء / العقد')+fld('meta','location','الموقع')+fld('meta','contractor','المقاول')+fld('meta','preparer','معد التقرير / مدير المشروع')+fld('meta','engineer','المهندس المشرف / المقيم')+'</div></div>'+
-  '<div class="card"><h2>المدة والقيمة</h2><div class="fields">'+fld('meta','start','تاريخ بدء العقد','date')+fld('meta','end','تاريخ الانتهاء التعاقدي','date')+'<div class="f"><span>المدة الأصلية</span><b class="num" style="padding:6px 0">'+(cEnd()-cStart()+1)+' يوماً تقويمياً</b></div>'+fld('meta','value','قيمة العقد قبل الضريبة (إن لم تُدخل أسعار الوحدات)','number')+fld('meta','vat','ضريبة القيمة المضافة %','number')+fld('meta','currency','العملة')+fld('meta','supplyPct','نسبة احتساب المحابس الموردة غير المركبة من قيمة البند %','number')+'</div>'+
+  '<div class="card"><h2>نوع المشروع والمسميات</h2><p class="hint">تحدد الكلمات المستخدمة في البرنامج والتقارير: سجل التنفيذ، ووحدة القياس، والفعل.</p><div class="fields"><label class="f"><span>نوع المشروع</span><select '+B('meta','','kind')+'><option value="valves"'+(m.kind!=='works'?' selected':'')+'>توريد وتركيب محابس</option><option value="works"'+(m.kind==='works'?' selected':'')+'>أعمال عامة / محطات / مقاولات</option></select></label>'+
+  ['log','unit','verb'].map(function(k){var lb={log:'اسم سجل التنفيذ',unit:'الوحدة (مفرد)',verb:'الفعل'}[k],base=TERMS[m.kind==='works'?'works':'valves'][k];return '<label class="f"><span>'+lb+'</span><input '+B('meta','','terms.'+k)+' value="'+esc((m.terms||{})[k]||'')+'" placeholder="'+esc(base)+'"></label>'}).join('')+'</div></div>'+
+  '<div class="card"><h2>المدة والقيمة</h2><div class="fields">'+fld('meta','start','تاريخ بدء العقد','date')+fld('meta','end','تاريخ الانتهاء التعاقدي','date')+'<div class="f"><span>المدة الأصلية</span><b class="num" style="padding:6px 0">'+(cEnd()-cStart()+1)+' يوماً تقويمياً</b></div>'+fld('meta','value','قيمة العقد قبل الضريبة (إن لم تُدخل أسعار الوحدات)','number')+fld('meta','vat','ضريبة القيمة المضافة %','number')+fld('meta','currency','العملة')+fld('meta','supplyPct','نسبة احتساب الكميات الموردة غير المنفذة من قيمة البند %','number')+'</div>'+
   '<div class="f"><span>أيام العطلة الأسبوعية (لا يُحسب فيها عمل في الجدول)</span><div class="toolbar">'+DOWS.map(function(d,i){return '<label class="chk"><input type="checkbox" data-wk="'+i+'"'+(m.weekend.indexOf(i)>=0?' checked':'')+'>'+d+'</label>'}).join('')+'</div></div></div>'+
   '<div class="card"><h2>الشعار</h2><div class="toolbar">'+(logoSrc()?'<img src="'+logoSrc()+'" alt="" style="height:60px;background:#fff;border-radius:6px;padding:2px">':'')+'<label class="btn">تغيير الشعار<input type="file" accept="image/*" data-act-logo hidden></label>'+(m.logo?'<button class="btn" data-act="logo-reset">استعادة الشعار الافتراضي</button>':'')+'</div></div>'+
-  storageCard()+'<div class="card"><h2>الحفظ والنقل</h2><p class="hint">التعديلات تُحفظ تلقائياً في هذا المتصفح. لنسخة دائمة أو لنقلها لجهاز آخر: «حفظ نسخة HTML محدّثة» يحمّل ملف الصفحة كاملاً بكل بياناتك (افتحه بدل القديم)، و«تصدير ملف المشروع» يحمّل ملف بيانات JSON يمكن فتحه لاحقاً.</p><div class="toolbar"><button class="btn primary" data-act="save-html">حفظ نسخة HTML محدّثة</button><button class="btn" data-act="export-json">تصدير ملف المشروع (JSON)</button><label class="btn">فتح ملف مشروع (JSON أو Excel)<input type="file" accept=".json,.xlsx,application/json" data-act-import hidden></label><button class="btn" data-act="csv" data-v="installs">CSV المحابس</button><button class="btn" data-act="csv" data-v="supplies">CSV التوريدات</button><button class="btn" data-act="csv" data-v="expenses">CSV المصاريف</button><span class="grow"></span><button class="btn danger" data-act="reset">استعادة الخطة الافتراضية</button></div></div>'+
+  storageCard()+'<div class="card"><h2>الحفظ والنقل</h2><p class="hint">التعديلات تُحفظ تلقائياً في هذا المتصفح. لنسخة دائمة أو لنقلها لجهاز آخر: «حفظ نسخة HTML محدّثة» يحمّل ملف الصفحة كاملاً بكل بياناتك (افتحه بدل القديم)، و«تصدير ملف المشروع» يحمّل ملف بيانات JSON يمكن فتحه لاحقاً.</p><div class="toolbar"><button class="btn primary" data-act="save-html">حفظ نسخة HTML محدّثة</button><button class="btn" data-act="export-json">تصدير ملف المشروع (JSON)</button><label class="btn">فتح ملف مشروع (JSON أو Excel)<input type="file" accept=".json,.xlsx,application/json" data-act-import hidden></label><button class="btn" data-act="csv" data-v="installs">CSV '+TM('log')+'</button><button class="btn" data-act="csv" data-v="supplies">CSV التوريدات</button><button class="btn" data-act="csv" data-v="expenses">CSV المصاريف</button><span class="grow"></span><button class="btn danger" data-act="reset">استعادة الخطة الافتراضية</button></div></div>'+
   '<div class="card"><h2>المظهر</h2><div class="seg">'+[['','تلقائي'],['light','فاتح'],['dark','داكن']].map(function(x){return '<button data-act="theme" data-v="'+x[0]+'" aria-pressed="'+((document.documentElement.getAttribute('data-theme')||'')===x[0])+'">'+x[1]+'</button>'}).join('')+'</div></div>'+
-  '<div class="card"><h2>عن البرنامج</h2><dl class="facts"><dt>البرنامج</dt><dd>متابعة المشاريع – توريد وتركيب المحابس</dd><dt>تصميم وبرمجة</dt><dd>م. ياسر محمد عبدالجابر</dd><dt>الإصدار</dt><dd class="num" id="app-ver">'+(DESK?'…':'نسخة المتصفح')+'</dd><dt>حقوق الطبع</dt><dd>© '+Math.max(2026,new Date().getFullYear())+' م. ياسر محمد عبدالجابر. جميع الحقوق محفوظة. لا يجوز نسخ البرنامج أو توزيعه أو تعديله دون إذن كتابي من المؤلف.</dd></dl></div>';
+  '<div class="card"><h2>عن البرنامج</h2><dl class="facts"><dt>البرنامج</dt><dd>متابعة المشاريع</dd><dt>تصميم وبرمجة</dt><dd>م. ياسر محمد عبدالجابر</dd><dt>الإصدار</dt><dd class="num" id="app-ver">'+(DESK?'…':'نسخة المتصفح')+'</dd><dt>حقوق الطبع</dt><dd>© '+Math.max(2026,new Date().getFullYear())+' م. ياسر محمد عبدالجابر. جميع الحقوق محفوظة. لا يجوز نسخ البرنامج أو توزيعه أو تعديله دون إذن كتابي من المؤلف.</dd></dl></div>';
   if(DESK&&HOST.info)HOST.info().then(function(i){var a=$('#db-path');if(a)a.textContent=i.dbPath;var b=$('#app-ver');if(b)b.textContent=i.version})
 }
 document.addEventListener('change',function(e){
   var t=e.target;
   if(t.hasAttribute('data-wk')){var i=+t.getAttribute('data-wk');mutate(function(){var w=state.meta.weekend.filter(function(x){return x!==i});if(t.checked)w.push(i);w.sort();if(w.length>=7)w=[5];state.meta.weekend=w});return}
   if(t.hasAttribute('data-act-logo')&&t.files[0]){var fr=new FileReader();fr.onload=function(){shrink(fr.result,600,function(u){mutate(function(){state.meta.logo=u})})};fr.readAsDataURL(t.files[0]);return}
-  if(t.hasAttribute('data-act-import')&&t.files[0]){var r2=new FileReader();r2.onload=function(){try{var o=JSON.parse(r2.result);if(o.state)o=o.state;if(!o||!o.boq||!o.meta)throw 0;ask('سيتم استبدال بيانات المشروع الحالية بالملف المختار. متابعة؟','استبدال البيانات').then(function(ok){if(!ok)return;snap();state=normalize(o);saveDraft();sched();renderAll();toast('تم فتح ملف المشروع')})}catch(err){toast('الملف غير صالح')}};var f0=t.files[0];if(/\.xlsx$/i.test(f0.name)){f0.arrayBuffer().then(readXlsxState).then(function(o){if(!o){toast('ملف Excel لا يحتوي على بيانات المشروع (استخدم نسخة Excel الكاملة)');return}ask('سيتم استبدال بيانات المشروع الحالية ببيانات ملف Excel. متابعة؟','استبدال البيانات').then(function(ok){if(!ok)return;snap();state=normalize(o);saveDraft();sched();renderAll();toast('تم فتح البيانات من ملف Excel')})}).catch(function(){toast('تعذّر قراءة ملف Excel')})}else r2.readAsText(f0);t.value=''}
+  if(t.hasAttribute('data-act-import')&&t.files[0]){var r2=new FileReader();r2.onload=function(){try{var o=asProject(JSON.parse(r2.result));if(!o)throw 0;ask('سيتم استبدال بيانات المشروع الحالية بالملف المختار. متابعة؟','استبدال البيانات').then(function(ok){if(!ok)return;snap();state=normalize(o);saveDraft();sched();renderAll();toast('تم فتح ملف المشروع')})}catch(err){toast('الملف غير صالح')}};var f0=t.files[0];if(/\.xlsx$/i.test(f0.name)){f0.arrayBuffer().then(readXlsxState).then(function(o){if(!o){toast('ملف Excel لا يحتوي على بيانات المشروع (استخدم نسخة Excel الكاملة)');return}ask('سيتم استبدال بيانات المشروع الحالية ببيانات ملف Excel. متابعة؟','استبدال البيانات').then(function(ok){if(!ok)return;snap();state=normalize(o);saveDraft();sched();renderAll();toast('تم فتح البيانات من ملف Excel')})}).catch(function(){toast('تعذّر قراءة ملف Excel')})}else r2.readAsText(f0);t.value=''}
 });
 function shrink(src,w,cb){var im=new Image();im.onload=function(){var s=Math.min(1,w/im.width),c=document.createElement('canvas');c.width=Math.round(im.width*s);c.height=Math.round(im.height*s);var x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(im,0,0,c.width,c.height);cb(c.toDataURL('image/jpeg',.85))};im.onerror=function(){cb(src)};im.src=src}
 
 /* ================= report pages ================= */
-var RSECS=[['cover','بيانات المشروع والتقرير'],['summary','ملخص الموقف'],['boq','حصر الأعمال (الكميات)'],['monthly','ملخص التركيب الشهري'],['schedule','الجدول الزمني (جدول)'],['gantt','المخطط الزمني (Gantt)'],['events','أوامر الإيقاف وإضافة المدد'],['installs','سجل المحابس المركبة'],['supplies','سجل التوريدات'],['expenses','المصاريف'],['plan','خطة العمل (الأقسام المختارة)'],['rates','معدلات الإنتاج'],['team','فريق العمل'],['equip','المعدات'],['risks','سجل المخاطر'],['conditions','شروط مجال العمل'],['notes','ملاحظات'],['sign','التوقيعات']];
+var RSECS=[['cover','بيانات المشروع والتقرير'],['summary','ملخص الموقف'],['boq','حصر الأعمال (الكميات)'],['monthly','ملخص التنفيذ الشهري'],['schedule','الجدول الزمني (جدول)'],['gantt','المخطط الزمني (Gantt)'],['events','أوامر الإيقاف وإضافة المدد'],['installs','سجل الأعمال المنفذة'],['supplies','سجل التوريدات'],['expenses','المصاريف'],['plan','خطة العمل (الأقسام المختارة)'],['rates','معدلات الإنتاج'],['team','فريق العمل'],['equip','المعدات'],['risks','سجل المخاطر'],['conditions','شروط مجال العمل'],['notes','ملاحظات'],['sign','التوقيعات']];
 function repRange(){var R=state.report,a=R.from?dnum(R.from):-Infinity,b=R.to?dnum(R.to):todayNum();if(isNaN(a))a=-Infinity;if(isNaN(b))b=todayNum();return {a:a,b:b}}
 function inR(r,g){var d=dnum(r.date);return !isNaN(d)&&d>=g.a&&d<=g.b}
 function buildPages(host){
@@ -569,17 +596,17 @@ function buildPages(host){
     var cs=cStart(),re=revEnd(),dur=re-cs+1,elp=clamp(asOf-cs+1,0,dur);
     var pIn=state.installs.filter(function(r){return inR(r,g)}).reduce(function(s,r){return s+num(r.qty)},0);
     var exps=state.expenses.filter(function(r){return !r.hide&&inR(r,g)});
-    var k=[['نسبة التركيب الفعلية',pct(o.act)+'%','المخطط '+pct(o.plan)+'%'],['المحابس المركبة',qn(o.inst),'من '+qn(o.q)+' محبس'],['المركب خلال الفترة',qn(pIn),R.from?fs(g.a)+' – '+fs(g.b):'حتى '+fs(g.b)],['المحابس الموردة',qn(o.sup),pct(o.sp)+'% من الكمية'],
+    var k=[['نسبة '+TM('verbAl')+' الفعلية',pct(o.act)+'%','المخطط '+pct(o.plan)+'%'],[''+TM('log')+'',qn(o.inst),'من '+qn(o.q)+' '+TM('unit')+''],['المركب خلال الفترة',qn(pIn),R.from?fs(g.a)+' – '+fs(g.b):'حتى '+fs(g.b)],[''+TM('items')+' الموردة',qn(o.sup),pct(o.sp)+'% من الكمية'],
       ['المدة المنقضية',elp+' يوم','من '+dur+' يوماً ('+pct(elp/dur)+'%)'],['المتبقي من المدة',(re-asOf>=0?(re-asOf)+' يوم':'متجاوزة'),'حتى '+fs(re)],['الإيقاف / التمديد','+'+addDays()+' يوم','إيقاف '+stopDays()+' · تمديد '+extDays()],(S.expenses?['المصاريف',money(expTotal(exps)),c+(R.from?' خلال الفترة':'')]:(v.tot&&R.prices?['قيمة المنفذ',money(v.ex),c]:['المهام المتأخرة',String(state.tasks.filter(function(t){return !t.ms&&statusOf(t)==='late'}).length),'مهمة']))];
     var gap=o.act-o.plan;
-    var txt='بلغت نسبة التركيب الفعلية '+pct(o.act)+'% مقابل '+pct(o.plan)+'% مخطط حتى تاريخ '+fs(asOf)+'، حيث تم تركيب '+qn(o.inst)+' محبساً من أصل '+qn(o.q)+'، وتوريد '+qn(o.sup)+' محبساً. '+(o.q?(gap>=-0.005?'الأعمال مطابقة للجدول الزمني أو متقدمة عليه.':'الأعمال متأخرة عن الجدول الزمني بنسبة '+pct(-gap)+'%.'):'')+(addDays()?' أضيف للمدة التعاقدية '+addDays()+' يوماً بسبب أوامر الإيقاف/التمديد، ليصبح تاريخ الانتهاء المعدّل '+fl(re)+'.':'');
+    var txt='بلغت نسبة '+TM('verbAl')+' الفعلية '+pct(o.act)+'% مقابل '+pct(o.plan)+'% مخطط حتى تاريخ '+fs(asOf)+'، حيث تم '+TM('verb')+' '+qn(o.inst)+' '+TM('unit2')+' من أصل '+qn(o.q)+'، وتوريد '+qn(o.sup)+' '+TM('unit2')+'. '+(o.q?(gap>=-0.005?'الأعمال مطابقة للجدول الزمني أو متقدمة عليه.':'الأعمال متأخرة عن الجدول الزمني بنسبة '+pct(-gap)+'%.'):'')+(addDays()?' أضيف للمدة التعاقدية '+addDays()+' يوماً بسبب أوامر الإيقاف/التمديد، ليصبح تاريخ الانتهاء المعدّل '+fl(re)+'.':'');
     flow(block('ملخص الموقف','<div class="kp">'+k.map(function(x){return '<div><span>'+x[0]+'</span><b>'+x[1]+'</b><small>'+esc(x[2])+'</small></div>'}).join('')+'</div><p class="note">'+esc(txt)+'</p>'));
   }
   if(S.boq){
     var tq=0,ts=0,tp=0,ti=0,tv=0,te=0,pr=R.prices&&v.hasRates;
     var rows=state.boq.filter(function(b){return !b.hide}).map(function(b){var q=num(b.qty),s=suppliedOf(b.id,asOf),i=installedOf(b.id,asOf),pi=state.installs.filter(function(r){return r.boq===b.id&&inR(r,g)}).reduce(function(x,r){return x+num(r.qty)},0),r=rateOf(b);tq+=q;ts+=s;ti+=i;tp+=pi;tv+=q*r;te+=Math.min(i,q)*r;
       return '<td>'+esc(b.no)+'</td><td>'+esc(b.dia?b.dia+' بوصة':'—')+'</td><td>'+esc(b.unit)+'</td><td>'+qn(q)+'</td><td>'+qn(s)+'</td>'+(R.from?'<td>'+qn(pi)+'</td>':'')+'<td>'+qn(i)+'</td><td>'+qn(Math.max(0,q-i))+'</td><td><div class="rb"><i style="width:'+pct(q?Math.min(1,i/q):0)+'%"></i></div>'+pct(q?i/q:0)+'%</td>'+(pr?'<td>'+money(r)+'</td><td>'+money(Math.min(i,q)*r)+'</td>':'')});
-    table('حصر الأعمال – الموقف حتى '+fs(asOf),['البند','القطر','الوحدة','الكمية التعاقدية','الموَرَّد'].concat(R.from?['مركب خلال الفترة']:[]).concat(['المركب (تراكمي)','المتبقي','نسبة الإنجاز']).concat(pr?['سعر الوحدة','قيمة المنفذ']:[]),rows,'<td colspan="3">الإجمالي</td><td>'+qn(tq)+'</td><td>'+qn(ts)+'</td>'+(R.from?'<td>'+qn(tp)+'</td>':'')+'<td>'+qn(ti)+'</td><td>'+qn(Math.max(0,tq-ti))+'</td><td>'+pct(tq?ti/tq:0)+'%</td>'+(pr?'<td></td><td>'+money(te)+'</td>':''));
+    table('حصر الأعمال – الموقف حتى '+fs(asOf),['البند',TM('diaCol'),'الوحدة','الكمية التعاقدية','الموَرَّد'].concat(R.from?['مركب خلال الفترة']:[]).concat(['المركب (تراكمي)','المتبقي','نسبة الإنجاز']).concat(pr?['سعر الوحدة','قيمة المنفذ']:[]),rows,'<td colspan="3">الإجمالي</td><td>'+qn(tq)+'</td><td>'+qn(ts)+'</td>'+(R.from?'<td>'+qn(tp)+'</td>':'')+'<td>'+qn(ti)+'</td><td>'+qn(Math.max(0,tq-ti))+'</td><td>'+pct(tq?ti/tq:0)+'%</td>'+(pr?'<td></td><td>'+money(te)+'</td>':''));
     if(pr)flow(block('','<p class="note">قيمة العقد قبل الضريبة: <b>'+money(tv)+' '+c+'</b> · قيمة الأعمال المنفذة: <b>'+money(v.ex)+' '+c+'</b> ('+pct(tv?v.ex/tv:0)+'%)'+(num(m.vat)?' · شامل الضريبة: '+money(v.ex*(1+v.vat))+' '+c:'')+'</p>'));
   }
   if(S.monthly){
@@ -587,7 +614,7 @@ function buildPages(host){
     state.installs.forEach(function(r){if(!inR(r,g))return;var d=new Date(dnum(r.date)*DAY),k2=d.getUTCFullYear()*100+d.getUTCMonth();ms[k2]=ms[k2]||{};ms[k2][r.boq]=(ms[k2][r.boq]||0)+num(r.qty)});
     var keys=Object.keys(ms).sort(),cum=0,colT={};
     var mrows=keys.map(function(k2){var y=Math.floor(k2/100),mo=k2%100,t=0;var cells=bl.map(function(b){var x=ms[k2][b.id]||0;t+=x;colT[b.id]=(colT[b.id]||0)+x;return '<td>'+(x?qn(x):'–')+'</td>'}).join('');cum+=t;return '<td class="tx">'+fMon.format(new Date(Date.UTC(y,mo,1)))+'</td>'+cells+'<td><b>'+qn(t)+'</b></td><td>'+qn(cum)+'</td>'});
-    if(mrows.length)table('ملخص التركيب الشهري',['الشهر'].concat(bl.map(function(b){return esc(b.dia?b.dia+'"':b.no)})).concat(['الإجمالي','التراكمي']),mrows,'<td>الإجمالي</td>'+bl.map(function(b){return '<td>'+qn(colT[b.id]||0)+'</td>'}).join('')+'<td>'+qn(cum)+'</td><td></td>');
+    if(mrows.length)table('ملخص '+TM('verbAl')+' الشهري',['الشهر'].concat(bl.map(function(b){return esc(b.dia?b.dia+'"':b.no)})).concat(['الإجمالي','التراكمي']),mrows,'<td>الإجمالي</td>'+bl.map(function(b){return '<td>'+qn(colT[b.id]||0)+'</td>'}).join('')+'<td>'+qn(cum)+'</td><td></td>');
   }
   if(S.schedule){
     var srows=state.tasks.map(function(t){var st=statusOf(t),a=actualOf(t),pr2=progOf(t,asOf);return '<td>'+esc(t.code)+'</td><td class="tx">'+esc(t.name)+'</td><td>'+(t.ms?'معلم':t.dur)+'</td><td>'+(t.bs?fs(dnum(t.bs)):'—')+'</td><td>'+(t.bf?fs(dnum(t.bf)):'—')+'</td><td>'+fs(tS(t))+'</td><td>'+fs(tF(t))+'</td><td>'+(isNaN(a.s)?'—':fs(a.s))+'</td><td>'+(isNaN(a.f)?'—':fs(a.f))+'</td><td>'+pct(pr2)+'%</td><td class="'+(st==='done'?'ok':st==='late'?'bad':st==='active'?'wr':'')+'">'+STL[st]+'</td>'});
@@ -613,11 +640,11 @@ function buildPages(host){
   }
   if(S.installs){
     var il=state.installs.filter(function(r){return !r.hide&&inR(r,g)&&boqById(r.boq)}).sort(function(a,b){return dnum(a.date)-dnum(b.date)}),it=0;
-    table('سجل المحابس المركبة'+(R.from?' خلال الفترة':''),['#','التاريخ','القطر','العدد','الموقع','الرقم التسلسلي','اختبار الضغط','انقطاع (س)','ملاحظات'],il.map(function(r,i){it+=num(r.qty);return '<td>'+(i+1)+'</td><td>'+fsi(r.date)+'</td><td>'+esc(boqShort(r.boq))+'</td><td>'+qn(num(r.qty))+'</td><td class="tx">'+esc(r.loc||'')+'</td><td>'+esc(r.serial||'')+'</td><td class="'+(r.test==='ناجح'?'ok':r.test==='غير ناجح'?'bad':'')+'">'+esc(r.test||'')+'</td><td>'+(r.shut===''||r.shut==null?'':qn(num(r.shut)))+'</td><td class="tx">'+esc(r.notes||'')+'</td>'}),il.length?'<td colspan="3">الإجمالي</td><td>'+qn(it)+'</td><td colspan="5"></td>':null);
+    table('سجل '+TM('log')+''+(R.from?' خلال الفترة':''),['#','التاريخ',TM('itemCol'),'العدد','الموقع','الرقم التسلسلي','اختبار الضغط','انقطاع (س)','ملاحظات'],il.map(function(r,i){it+=num(r.qty);return '<td>'+(i+1)+'</td><td>'+fsi(r.date)+'</td><td>'+esc(boqShort(r.boq))+'</td><td>'+qn(num(r.qty))+'</td><td class="tx">'+esc(r.loc||'')+'</td><td>'+esc(r.serial||'')+'</td><td class="'+(r.test==='ناجح'?'ok':r.test==='غير ناجح'?'bad':'')+'">'+esc(r.test||'')+'</td><td>'+(r.shut===''||r.shut==null?'':qn(num(r.shut)))+'</td><td class="tx">'+esc(r.notes||'')+'</td>'}),il.length?'<td colspan="3">الإجمالي</td><td>'+qn(it)+'</td><td colspan="5"></td>':null);
   }
   if(S.supplies){
     var sl=state.supplies.filter(function(r){return !r.hide&&inR(r,g)&&boqById(r.boq)}).sort(function(a,b){return dnum(a.date)-dnum(b.date)}),st2=0;
-    table('سجل التوريدات'+(R.from?' خلال الفترة':''),['#','التاريخ','القطر','العدد','المورد','رقم السند','ملاحظات'],sl.map(function(r,i){st2+=num(r.qty);return '<td>'+(i+1)+'</td><td>'+fsi(r.date)+'</td><td>'+esc(boqShort(r.boq))+'</td><td>'+qn(num(r.qty))+'</td><td class="tx">'+esc(r.supplier||'')+'</td><td>'+esc(r.ref||'')+'</td><td class="tx">'+esc(r.notes||'')+'</td>'}),sl.length?'<td colspan="3">الإجمالي</td><td>'+qn(st2)+'</td><td colspan="3"></td>':null);
+    table('سجل التوريدات'+(R.from?' خلال الفترة':''),['#','التاريخ',TM('itemCol'),'العدد','المورد','رقم السند','ملاحظات'],sl.map(function(r,i){st2+=num(r.qty);return '<td>'+(i+1)+'</td><td>'+fsi(r.date)+'</td><td>'+esc(boqShort(r.boq))+'</td><td>'+qn(num(r.qty))+'</td><td class="tx">'+esc(r.supplier||'')+'</td><td>'+esc(r.ref||'')+'</td><td class="tx">'+esc(r.notes||'')+'</td>'}),sl.length?'<td colspan="3">الإجمالي</td><td>'+qn(st2)+'</td><td colspan="3"></td>':null);
   }
   if(S.expenses){
     var el2=state.expenses.filter(function(r){return !r.hide&&inR(r,g)}).sort(function(a,b){return dnum(a.date)-dnum(b.date)}),bc={},et=expTotal(el2);
@@ -628,7 +655,7 @@ function buildPages(host){
     table('تفاصيل المصاريف',['#','التاريخ','التصنيف','البيان','الكمية','سعر الوحدة','قبل الضريبة','الضريبة','الإجمالي','المورد','الفاتورة'],el2.map(function(r,i){return '<td>'+(i+1)+'</td><td>'+fsi(r.date)+'</td><td>'+esc(r.cat||'')+'</td><td class="tx">'+esc(r.desc||'')+'</td><td>'+(num(r.qty)?qn(num(r.qty)):'')+'</td><td>'+(num(r.price)?money(num(r.price)):'')+'</td><td>'+money(expNet(r))+'</td><td>'+(expVat(r)?money(expVat(r)):'–')+'</td><td><b>'+money(expTot(r))+'</b></td><td class="tx">'+esc(r.vendor||'')+'</td><td>'+esc(r.ref||'')+'</td>'}),el2.length?'<td colspan="6">الإجمالي</td><td>'+money(en)+'</td><td>'+money(ev)+'</td><td>'+money(et)+'</td><td colspan="2"></td>':null);
   }
   if(S.plan)state.sections.filter(function(s){return s.rep}).forEach(function(s){paras(s.title,s.body)});
-  if(S.rates){var rt=0;table('معدلات الإنتاج وتوزيع الفرق',['القطر','المجموعات','أفراد/مجموعة','المستهدف اليومي/مجموعة','الإجمالي اليومي','الكمية','المدة (يوم)'],state.rates.map(function(r){var b=boqById(r.boq);rt+=rateDur(r);return '<td>'+esc(boqName(r.boq))+'</td><td>'+qn(num(r.crews))+'</td><td>'+qn(num(r.per))+'</td><td>'+qn(num(r.daily))+'</td><td>'+qn(num(r.crews)*num(r.daily))+'</td><td>'+(b?qn(num(b.qty)):'')+'</td><td>'+rateDur(r)+'</td>'}),'<td colspan="6">إجمالي أيام العمل الفعلية</td><td>'+rt+'</td>')}
+  if(S.rates){var rt=0;table('معدلات الإنتاج وتوزيع الفرق',[TM('itemCol'),'المجموعات','أفراد/مجموعة','المستهدف اليومي/مجموعة','الإجمالي اليومي','الكمية','المدة (يوم)'],state.rates.map(function(r){var b=boqById(r.boq);rt+=rateDur(r);return '<td>'+esc(boqName(r.boq))+'</td><td>'+qn(num(r.crews))+'</td><td>'+qn(num(r.per))+'</td><td>'+qn(num(r.daily))+'</td><td>'+qn(num(r.crews)*num(r.daily))+'</td><td>'+(b?qn(num(b.qty)):'')+'</td><td>'+rateDur(r)+'</td>'}),'<td colspan="6">إجمالي أيام العمل الفعلية</td><td>'+rt+'</td>')}
   if(S.team)table('فريق العمل',['#','الوظيفة','سنوات الخبرة','العدد'],state.team.map(function(r,i){return '<td>'+(i+1)+'</td><td class="tx">'+esc(r.role)+'</td><td>'+esc(r.exp)+'</td><td>'+esc(r.count)+'</td>'}),'<td colspan="3">الإجمالي</td><td>'+qn(state.team.reduce(function(s,r){return s+num(r.count)},0))+'</td>');
   if(S.equip)table('المعدات والأدوات',['#','المعدة','العدد','ملاحظات'],state.equip.map(function(r,i){return '<td>'+(i+1)+'</td><td class="tx">'+esc(r.name)+'</td><td>'+esc(r.count)+'</td><td class="tx">'+esc(r.notes||'')+'</td>'}));
   if(S.risks)table('سجل المخاطر وخطط التخفيف',['#','الخطر','الاحتمالية','إجراءات التخفيف'],state.risks.map(function(r,i){return '<td>'+(i+1)+'</td><td class="tx"><b>'+esc(r.risk)+'</b><br>'+esc(r.desc||'')+'</td><td>'+esc(r.level||'')+'</td><td class="tx">'+esc(r.mit||'')+'</td>'}));
@@ -645,10 +672,10 @@ function renderReport(p){
   '<label class="f"><span>من تاريخ (اختياري)</span><input type="date" '+B('report','','from')+' value="'+esc(R.from)+'"></label><label class="f"><span>حتى تاريخ</span><input type="date" '+B('report','','to')+' value="'+esc(R.to)+'" placeholder="اليوم"></label></div>'+
   '<p class="hint">بدون «من تاريخ» يكون التقرير تراكمياً حتى التاريخ المحدد (اليوم إذا تُرك فارغاً).</p>'+
   '<div class="toolbar">'+(canPrint()?'<button class="btn primary" data-act="print">طباعة / حفظ PDF</button><button class="btn" data-act="pdf">تحميل PDF مباشرة</button>':'<button class="btn primary" data-act="pdf">تحميل PDF</button>')+'<button class="btn" data-act="xlsx">تحميل Excel منسق</button></div><p class="hint">ملف Excel يتبع نفس الإعدادات: الفترة، والأقسام المختارة (كل قسم في شيت)، وإخفاء الأسعار والسجلات المخفية.</p><span class="prog" id="pdf-prog"></span></div>'+
-  '<div class="card"><h3>الأقسام الظاهرة في التقرير</h3><div class="secs">'+RSECS.map(function(s){return '<label><input type="checkbox" '+B('report','','secs.'+s[0])+(R.secs[s[0]]?' checked':'')+'>'+s[1]+'</label>'}).join('')+'</div>'+
+  '<div class="card"><h3>الأقسام الظاهرة في التقرير</h3><div class="secs">'+RSECS.map(function(s){return '<label><input type="checkbox" '+B('report','','secs.'+s[0])+(R.secs[s[0]]?' checked':'')+'>'+(s[0]==='installs'?'سجل '+esc(TM('log')):s[0]==='monthly'?'ملخص '+esc(TM('verbAl'))+' الشهري':s[1])+'</label>'}).join('')+'</div>'+
   '<div class="toolbar"><button class="btn sm" data-act="secs-all" data-v="1">تحديد الكل</button><button class="btn sm" data-act="secs-all" data-v="0">إلغاء الكل</button></div>'+
   '<label class="chk"><input type="checkbox" '+B('report','','prices')+(R.prices?' checked':'')+'> إظهار الأسعار والقيم</label><label class="chk"><input type="checkbox" '+B('report','','footer')+(R.footer?' checked':'')+'> تذييل الشركة أسفل الصفحات</label><label class="chk"><input type="checkbox" '+B('report','','breaks')+(R.breaks?' checked':'')+'> كل قسم يبدأ في صفحة جديدة</label>'+
-  '<p class="hint">لإخفاء سجل معين (تركيب، توريد، مصروف، أمر إيقاف) اضغط 👁 بجانبه في تبويبه. ولإخفاء قسم من خطة العمل ألغِ «في التقرير» بجانبه.</p></div>'+
+  '<p class="hint">لإخفاء سجل معين (تنفيذ، توريد، مصروف، أمر إيقاف) اضغط 👁 بجانبه في تبويبه. ولإخفاء قسم من خطة العمل ألغِ «في التقرير» بجانبه.</p></div>'+
   '<div class="card"><h3>ملاحظات وتوقيعات</h3><label class="f"><span>ملاحظات تظهر في التقرير</span><textarea '+B('report','','notes')+' rows="4">'+esc(R.notes)+'</textarea></label>'+
   R.sign.map(function(s,i){return '<div class="fields" style="grid-template-columns:1fr 1fr"><label class="f"><span>الصفة '+(i+1)+'</span><input '+B('report','','sign.'+i+'.t')+' value="'+esc(s.t)+'"></label><label class="f"><span>الاسم</span><input '+B('report','','sign.'+i+'.n')+' value="'+esc(s.n)+'"></label></div>'}).join('')+'</div>'+
   '</div><div class="preview" id="preview"><span class="prog">جارٍ تجهيز المعاينة…</span></div></div>';
@@ -723,10 +750,10 @@ function buildDoc(next){
 function saveHtml(){var next=clone(state);next.rev=(state.rev||1)+1;next.meta.updated=new Date().toISOString();offerFile(fname('html'),buildDoc(next));state.rev=next.rev;dirty=false;saveDraft();renderAll()}
 function exportCsv(c){
   var q=function(v){v=String(v==null?'':v);return /[",\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v},rows;
-  if(c==='installs')rows=[['التاريخ','القطر','العدد','الموقع','الرقم التسلسلي','اختبار الضغط','انقطاع المياه (ساعة)','الفريق','ملاحظات']].concat(filt('installs',state.installs).map(function(r){return [r.date,boqName(r.boq),r.qty,r.loc,r.serial,r.test,r.shut,r.team,r.notes]}));
-  else if(c==='supplies')rows=[['التاريخ','القطر','العدد','المورد','رقم السند','ملاحظات']].concat(filt('supplies',state.supplies).map(function(r){return [r.date,boqName(r.boq),r.qty,r.supplier,r.ref,r.notes]}));
+  if(c==='installs')rows=[['التاريخ',TM('itemCol'),'العدد','الموقع','الرقم التسلسلي','اختبار الضغط','انقطاع المياه (ساعة)','الفريق','ملاحظات']].concat(filt('installs',state.installs).map(function(r){return [r.date,boqName(r.boq),r.qty,r.loc,r.serial,r.test,r.shut,r.team,r.notes]}));
+  else if(c==='supplies')rows=[['التاريخ',TM('itemCol'),'العدد','المورد','رقم السند','ملاحظات']].concat(filt('supplies',state.supplies).map(function(r){return [r.date,boqName(r.boq),r.qty,r.supplier,r.ref,r.notes]}));
   else if(c==='expenses')rows=[['التاريخ','التصنيف','البيان','الكمية','سعر الوحدة','المبلغ قبل الضريبة','الضريبة %','قيمة الضريبة','الإجمالي','المورد','الفاتورة']].concat(filt('expenses',state.expenses).map(function(r){return [r.date,r.cat,r.desc,r.qty,r.price,expNet(r),num(r.vat),expVat(r),expTot(r),r.vendor,r.ref]}));
-  else if(c==='boq')rows=[['البند','القطر','الوصف','الوحدة','الكمية','سعر الوحدة','الإجمالي','الموَرَّد','المركب','المتبقي','الإنجاز %']].concat(state.boq.map(function(b){var qq=num(b.qty),i=installedOf(b.id);return [b.no,b.dia,b.desc,b.unit,qq,b.rate,qq*num(b.rate)||'',suppliedOf(b.id),i,Math.max(0,qq-i),pct(qq?i/qq:0)]}));
+  else if(c==='boq')rows=[['البند',TM('diaCol'),'الوصف','الوحدة','الكمية','سعر الوحدة','الإجمالي','الموَرَّد','المركب','المتبقي','الإنجاز %']].concat(state.boq.map(function(b){var qq=num(b.qty),i=installedOf(b.id);return [b.no,b.dia,b.desc,b.unit,qq,b.rate,qq*num(b.rate)||'',suppliedOf(b.id),i,Math.max(0,qq-i),pct(qq?i/qq:0)]}));
   else rows=[['الرمز','المهمة','المدة','البداية','النهاية','بداية الأساس','نهاية الأساس','الإنجاز %','الحالة']].concat(state.tasks.map(function(t){return [t.code,t.name,t.ms?0:t.dur,iso(tS(t)),iso(tF(t)),t.bs||'',t.bf||'',pct(progOf(t)),STL[statusOf(t)]]}));
   offerFile(fname('csv').replace('.csv','-'+c+'.csv'),'\ufeff'+rows.map(function(r){return r.map(q).join(',')}).join('\r\n'));
 }
@@ -752,7 +779,7 @@ document.addEventListener('click',function(e){
     case 'mv-grp':closeDlg();mutate(function(){var i=grpIdx(v),j=i+(+b.getAttribute('data-d'));if(j<0||j>=state.groups.length)return;var t=state.groups[i];state.groups[i]=state.groups[j];state.groups[j]=t});break;
     case 'baseline':ask('حفظ التواريخ الحالية للجدول كخط أساس للمقارنة؟ سيُستبدل خط الأساس الحالي.','حفظ خط الأساس').then(function(ok){if(ok)mutate(function(){state.tasks.forEach(function(t){t.bs=iso(tS(t));t.bf=iso(tF(t))})})});break;
     case 'hide':mutate(function(){var r=rowOf(c,id);if(r)r.hide=!r.hide});break;
-    case 'del':if(!rowOf(c,id))break;ask(c==='boq'&&state.installs.concat(state.supplies).some(function(x){return x.boq===id})?'هذا البند له سجلات تركيب أو توريد. حذفه؟':'حذف هذا السجل؟','حذف',true).then(function(ok){if(!ok)return;mutate(function(){state[c]=state[c].filter(function(x){return x.id!==id})});toast('تم الحذف (يمكنك التراجع)')});break;
+    case 'del':if(!rowOf(c,id))break;ask(c==='boq'&&state.installs.concat(state.supplies).some(function(x){return x.boq===id})?'هذا البند له سجلات '+TM('verb')+' أو توريد. حذفه؟':'حذف هذا السجل؟','حذف',true).then(function(ok){if(!ok)return;mutate(function(){state[c]=state[c].filter(function(x){return x.id!==id})});toast('تم الحذف (يمكنك التراجع)')});break;
     case 'mv':mutate(function(){var arr=state[c],i=arr.indexOf(rowOf(c,id)),j=i+(+b.getAttribute('data-d'));if(j<0||j>=arr.length)return;var t=arr[i];arr[i]=arr[j];arr[j]=t});break;
     case 'add-boq':mutate(function(){var n2=state.boq.length+1;state.boq.push({id:uid('b'),no:String(n2),dia:'',unit:'عمل',qty:0,rate:'',desc:''})});break;
     case 'add-row':mutate(function(){var o={id:uid(c.charAt(0))};if(c==='rates')o.boq=(state.boq[0]||{}).id;if(c==='risks')o.level='متوسطة';state[c].push(o)});break;

@@ -69,7 +69,7 @@ function dbInit(){
         if(!state.tasks.some(function(t){return t.bs})){initBaseline();any=false}
       }else if(HOST.blank){
         var d0=todayNum();
-        state.meta=Object.assign(state.meta,{client:'',po:'',location:'',engineer:'',value:'',start:iso(d0),end:iso(d0+179)});
+        state.meta=Object.assign(state.meta,{client:'',po:'',location:'',engineer:'',value:'',start:iso(d0),end:iso(d0+179),kind:'works',terms:{}});
         ['boq','installs','supplies','expenses','events','sections','team','equip','rates','risks','conditions'].forEach(function(k){state[k]=[]});
         state.tasks=state.tasks.filter(function(t){return t.ms}).map(function(t){t.preds=[];t.nb=t.code==='A1000'?iso(d0):'';t.bs='';t.bf='';return t});
         initBaseline();
@@ -80,7 +80,7 @@ function dbInit(){
       cacheLocal();sched();renderAll();
       cols.forEach(function(c){db.collection(c).onSnapshot(function(s){onRemote(c,s)},function(e){if(e&&e.code==='revoked'){DB.on=false;DB.status='off';renderStatus()}})});
       if(!any)dbQueue();
-      if(HOST.takeImport)HOST.takeImport().then(function(f){if(!f)return;var p=/\.xlsx$/i.test(f.name)?readXlsxState(f.bytes.buffer||f.bytes):Promise.resolve().then(function(){var o=JSON.parse(new TextDecoder().decode(f.bytes));return o&&o.state?o.state:o});return p.then(function(o){if(!o||!o.meta||!o.boq){toast('الملف لا يحتوي على بيانات مشروع صالحة');return}state=normalize(o);hist=[];fut=[];saveDraft();sched();renderAll();toast('تم استيراد المشروع من الملف')})}).catch(function(){toast('تعذّر قراءة الملف')});
+      if(HOST.takeImport)HOST.takeImport().then(function(f){if(!f)return;var p=/\.xlsx$/i.test(f.name)?readXlsxState(f.bytes.buffer||f.bytes):Promise.resolve().then(function(){return asProject(JSON.parse(new TextDecoder().decode(f.bytes)))});return p.then(function(o){if(!o||!o.meta||!o.boq){toast('الملف لا يحتوي على بيانات مشروع صالحة');return}state=normalize(o);hist=[];fut=[];saveDraft();sched();renderAll();toast('تم استيراد المشروع من الملف')})}).catch(function(){toast('تعذّر قراءة الملف')});
     });
   }).catch(function(){DB.status='error';DB.err='تعذّر الاتصال بقاعدة البيانات. التعديلات محفوظة في هذا المتصفح.';renderStatus()});
 }
@@ -197,7 +197,7 @@ function storageCard(){
   }
   if(HOST){
     var st=DB.on?(DB.ro?'متصلة (عرض فقط لهذا الحساب)':'متصلة – كل تعديل يُحفظ فوراً ويظهر على أي جهاز تفتح منه الصفحة'):DB.status==='loading'?'جارٍ الاتصال…':'غير متاحة في هذا العرض – التعديلات تُحفظ في هذا المتصفح';
-    return '<div class="card"><h2>قاعدة البيانات</h2><p class="hint">بيانات المشروع محفوظة في قاعدة بيانات الصفحة، في جداول مثل شيت Excel: البنود، المهام، المحابس المركبة، التوريدات، المصاريف، الإيقاف والمدد، وأقسام خطة العمل.</p><dl class="facts"><dt>الحالة</dt><dd>'+esc(st)+'</dd>'+(DB.at?'<dt>آخر حفظ</dt><dd>'+hm(DB.at)+'</dd>':'')+'</dl><div class="toolbar"><button class="btn primary" data-act="xlsx-full">تحميل نسخة Excel كاملة من قاعدة البيانات</button></div></div>';
+    return '<div class="card"><h2>قاعدة البيانات</h2><p class="hint">بيانات المشروع محفوظة في قاعدة بيانات الصفحة، في جداول مثل شيت Excel: البنود، المهام، '+TM('log')+'، التوريدات، المصاريف، الإيقاف والمدد، وأقسام خطة العمل.</p><dl class="facts"><dt>الحالة</dt><dd>'+esc(st)+'</dd>'+(DB.at?'<dt>آخر حفظ</dt><dd>'+hm(DB.at)+'</dd>':'')+'</dl><div class="toolbar"><button class="btn primary" data-act="xlsx-full">تحميل نسخة Excel كاملة من قاعدة البيانات</button></div></div>';
   }
   if(fdbSupported()){
     return '<div class="card"><h2>قاعدة البيانات (ملف Excel)</h2><p class="hint">اربط ملف Excel على جهازك ليكون قاعدة بيانات المشروع: كل تعديل يُكتب فيه تلقائياً بكل الجداول المنسقة، ويمكنك فتحه لاحقاً من هنا لاسترجاع كل البيانات. لا تعدّل الملف من Excel نفسه؛ عدّل من البرنامج.</p>'+
@@ -265,7 +265,7 @@ function buildWorkbook(full){
   var prices=full||R.prices,sub=full?'نسخة قاعدة البيانات الكاملة · '+fs(todayNum()):(R.from?'الفترة من '+fs(g.a)+' إلى '+fs(g.b):'حتى تاريخ '+fs(asOf));
   var o=overall(asOf),v=valueStats(asOf),M='#,##0.00',Q='#,##0.##',P='0.0%',D='dd/mm/yyyy';
   var boqs=state.boq.filter(vis);
-  var SH={inst:'المحابس المركبة',sup:'التوريدات',exp:'المصاريف'};
+  var SH={inst:TM('log').slice(0,31),sup:'التوريدات',exp:'المصاريف'};
   /* summary */
   var ws=xSheet(W,'الملخص',(R.title||'تقرير موقف الأعمال')+(R.no?' رقم '+R.no:''),[{w:26},{w:30},{w:26},{w:30}],{noFreeze:true,noHead:true,sub:sub});
   var lg=logoSrc();if(lg){try{var id=W.addImage({base64:lg,extension:/^data:image\/png/.test(lg)?'png':'jpeg'});ws.getRow(3).height=8;ws.addImage(id,{tl:{col:3.15,row:0.1},ext:{width:150,height:64}});ws.getRow(1).height=30;ws.getRow(2).height=26}catch(e){}}
@@ -277,9 +277,9 @@ function buildWorkbook(full){
   pair('تاريخ البدء',xD(cStart()),'تاريخ الانتهاء الأصلي',xD(cEnd()),[D,D]);
   pair('أيام الإيقاف / إضافة المدد',stopDays()+' / '+extDays()+' يوم','تاريخ الانتهاء المعدّل',xD(revEnd()),[null,D]);
   r++;band(ws,r++,4,'مؤشرات الأداء حتى '+fs(asOf));
-  pair('الكمية التعاقدية (محبس)',o.q,'المحابس الموردة',o.sup,[Q,Q]);
-  pair('المحابس المركبة',o.inst,'المتبقي للتركيب',Math.max(0,o.q-o.inst),[Q,Q]);
-  pair('نسبة التركيب الفعلية',o.act,'نسبة التركيب المخططة',o.plan,[P,P]);
+  pair('الكمية التعاقدية ('+TM('unit')+')',o.q,''+TM('items')+' الموردة',o.sup,[Q,Q]);
+  pair(''+TM('log')+'',o.inst,'المتبقي لل'+TM('verb')+'',Math.max(0,o.q-o.inst),[Q,Q]);
+  pair('نسبة '+TM('verbAl')+' الفعلية',o.act,'نسبة '+TM('verbAl')+' المخططة',o.plan,[P,P]);
   pair('نسبة التوريد',o.sp,'الفرق عن المخطط',o.act-o.plan,[P,P]);
   var cs=cStart(),re=revEnd(),dur=re-cs+1,el_=clamp(asOf-cs+1,0,dur);
   pair('المدة المنقضية (يوم)',el_,'المدة المعدّلة (يوم)',dur,[Q,Q]);
@@ -290,7 +290,7 @@ function buildWorkbook(full){
   if(!full&&R.secs.sign){var sg=R.sign.filter(function(x){return x.t||x.n});if(sg.length){r+=2;sg.slice(0,4).forEach(function(x,k){var cl=ws.getCell(r,k+1);cl.value=x.t;cl.font={name:XFONT,size:10,bold:true};cl.alignment={horizontal:'center'};var nm=ws.getCell(r+1,k+1);nm.value=x.n||'الاسم: ................';nm.alignment={horizontal:'center'};nm.font={name:XFONT,size:10};var si=ws.getCell(r+2,k+1);si.value='التوقيع: ................';si.alignment={horizontal:'center'};si.font={name:XFONT,size:10,color:{argb:XC.mut}}});ws.getRow(r+2).height=30}}
   /* BOQ */
   if(on('boq')){
-    var bc=[{h:'البند',w:7},{h:'القطر (بوصة)',w:9},{h:'الوصف',w:56,wrap:1},{h:'الوحدة',w:8},{h:'الكمية التعاقدية',w:11,fmt:Q},{h:'الموَرَّد',w:11,fmt:Q},{h:'المركب',w:11,fmt:Q},{h:'المتبقي',w:11,fmt:Q},{h:'نسبة الإنجاز',w:11,fmt:P}].concat(prices?[{h:'سعر الوحدة ('+c$+')',w:13,fmt:M},{h:'الإجمالي ('+c$+')',w:15,fmt:M},{h:'قيمة المنفذ ('+c$+')',w:15,fmt:M}]:[]);
+    var bc=[{h:'البند',w:7},{h:TM('diaCol'),w:9},{h:'الوصف',w:56,wrap:1},{h:'الوحدة',w:8},{h:'الكمية التعاقدية',w:11,fmt:Q},{h:'الموَرَّد',w:11,fmt:Q},{h:'المركب',w:11,fmt:Q},{h:'المتبقي',w:11,fmt:Q},{h:'نسبة الإنجاز',w:11,fmt:P}].concat(prices?[{h:'سعر الوحدة ('+c$+')',w:13,fmt:M},{h:'الإجمالي ('+c$+')',w:15,fmt:M},{h:'قيمة المنفذ ('+c$+')',w:15,fmt:M}]:[]);
     ws=xSheet(W,'حصر الأعمال','حصر الأعمال – جدول الكميات',bc,{land:1,sub:'الموقف حتى '+fs(asOf)});
     var r0=5;
     boqs.forEach(function(b,i){var rr=r0+i,q=num(b.qty),s=suppliedOf(b.id,asOf),ins=installedOf(b.id,asOf),rt=num(b.rate);
@@ -337,7 +337,7 @@ function buildWorkbook(full){
     var keys=Object.keys(ms).sort();
     if(keys.length){
       var mc2=[{h:'الشهر',w:16}].concat(boqs.map(function(b){return {h:b.dia?b.dia+'"':'بند '+b.no,w:8,fmt:Q}})).concat([{h:'الإجمالي',w:11,fmt:Q},{h:'التراكمي',w:11,fmt:Q}]);
-      ws=xSheet(W,'التركيب الشهري','ملخص التركيب الشهري حسب القطر',mc2,{land:1,sub:sub});
+      ws=xSheet(W,''+TM('verbAl')+' الشهري','ملخص '+TM('verbAl')+' الشهري حسب البند',mc2,{land:1,sub:sub});
       var nb=boqs.length,lc=colL(1+nb);
       keys.forEach(function(kk,i){var y=Math.floor(kk/100),mo=kk%100,rr=5+i;xRow(ws,rr,mc2,[fMon.format(new Date(Date.UTC(y,mo,1)))].concat(boqs.map(function(b){return ms[kk][b.id]||null})).concat([F('SUM(B'+rr+':'+lc+rr+')'),F(i?colL(2+nb+1)+(rr-1)+'+'+colL(2+nb)+rr:colL(2+nb)+rr)]),i)});
       var tr=5+keys.length;xTot(ws,tr,mc2,['الإجمالي'].concat(boqs.map(function(b,k){var L=colL(2+k);return F('SUM('+L+'5:'+L+(tr-1)+')')})).concat([F('SUM('+colL(2+nb)+'5:'+colL(2+nb)+(tr-1)+')'),'']));
@@ -360,8 +360,8 @@ function buildWorkbook(full){
     if(list.length)ws.autoFilter={from:{row:4,column:1},to:{row:tr-1,column:cols.length}};
   }
   var dia=function(id){var b=boqById(id);return b?(b.dia===''?null:num(b.dia)):null},bno=function(id){var b=boqById(id);return b?noVal(b):null};
-  if(on('installs'))logSheet('inst',state.installs,SH.inst,'سجل المحابس المركبة',[{h:'#',w:6},{h:'التاريخ',w:12,fmt:D},{h:'رقم البند',w:8},{h:'القطر (بوصة)',w:9},{h:'العدد',w:8,fmt:Q},{h:'الموقع (الحي / الشارع)',w:28,wrap:1},{h:'الرقم التسلسلي',w:16},{h:'اختبار الضغط',w:12},{h:'انقطاع المياه (ساعة)',w:11,fmt:Q},{h:'الفريق',w:14},{h:'ملاحظات',w:30,wrap:1}],function(x,i){return [i+1,xDs(x.date),bno(x.boq),dia(x.boq),num(x.qty),x.loc||'',x.serial||'',x.test||'',x.shut===''||x.shut==null?null:num(x.shut),x.team||'',x.notes||'']},5);
-  if(on('supplies'))logSheet('sup',state.supplies,SH.sup,'سجل التوريدات',[{h:'#',w:6},{h:'التاريخ',w:12,fmt:D},{h:'رقم البند',w:8},{h:'القطر (بوصة)',w:9},{h:'العدد',w:9,fmt:Q},{h:'المورد',w:26,wrap:1},{h:'رقم السند / الفاتورة',w:18},{h:'ملاحظات',w:36,wrap:1}],function(x,i){return [i+1,xDs(x.date),bno(x.boq),dia(x.boq),num(x.qty),x.supplier||'',x.ref||'',x.notes||'']},5);
+  if(on('installs'))logSheet('inst',state.installs,SH.inst,'سجل '+TM('log')+'',[{h:'#',w:6},{h:'التاريخ',w:12,fmt:D},{h:'رقم البند',w:8},{h:TM('diaCol'),w:9},{h:'العدد',w:8,fmt:Q},{h:'الموقع (الحي / الشارع)',w:28,wrap:1},{h:'الرقم التسلسلي',w:16},{h:'اختبار الضغط',w:12},{h:'انقطاع المياه (ساعة)',w:11,fmt:Q},{h:'الفريق',w:14},{h:'ملاحظات',w:30,wrap:1}],function(x,i){return [i+1,xDs(x.date),bno(x.boq),dia(x.boq),num(x.qty),x.loc||'',x.serial||'',x.test||'',x.shut===''||x.shut==null?null:num(x.shut),x.team||'',x.notes||'']},5);
+  if(on('supplies'))logSheet('sup',state.supplies,SH.sup,'سجل التوريدات',[{h:'#',w:6},{h:'التاريخ',w:12,fmt:D},{h:'رقم البند',w:8},{h:TM('diaCol'),w:9},{h:'العدد',w:9,fmt:Q},{h:'المورد',w:26,wrap:1},{h:'رقم السند / الفاتورة',w:18},{h:'ملاحظات',w:36,wrap:1}],function(x,i){return [i+1,xDs(x.date),bno(x.boq),dia(x.boq),num(x.qty),x.supplier||'',x.ref||'',x.notes||'']},5);
   if(on('expenses')){
     logSheet('exp',state.expenses,SH.exp,'المصاريف',[{h:'#',w:6},{h:'التاريخ',w:12,fmt:D},{h:'التصنيف',w:22,wrap:1},{h:'البيان',w:38,wrap:1},{h:'الكمية',w:9,fmt:Q},{h:'سعر الوحدة',w:11,fmt:M},{h:'المبلغ قبل الضريبة ('+c$+')',w:15,fmt:M},{h:'الضريبة %',w:9},{h:'قيمة الضريبة',w:12,fmt:M},{h:'الإجمالي ('+c$+')',w:15,fmt:M},{h:'المورد / الجهة',w:20,wrap:1},{h:'رقم الفاتورة',w:14}],function(x,i){var r=5+i;return [i+1,xDs(x.date),x.cat||'أخرى',x.desc||'',num(x.qty)||null,num(x.price)||null,(num(x.qty)&&num(x.price))?F('E'+r+'*F'+r,expNet(x)):expNet(x),num(x.vat),F('ROUND(G'+r+'*H'+r+'/100,2)',expVat(x)),F('G'+r+'+I'+r,expTot(x)),x.vendor||'',x.ref||'']},[7,9,10]);
     var cats=[];state.expenses.filter(function(x){return vis(x)&&inP(x)}).forEach(function(x){var k=x.cat||'أخرى';if(cats.indexOf(k)<0)cats.push(k)});
@@ -383,7 +383,7 @@ function buildWorkbook(full){
     var sub2=function(title,cols,rows,tot){band(ws,r++,cols.length,title);xHead(ws,r++,cols);var a=r;(typeof rows==='function'?rows(a):rows).forEach(function(x,i){xRow(ws,r++,cols,x,i)});if(tot)xTot(ws,r++,cols,tot(a,r-1));r++};
     if(on('team'))sub2('فريق العمل',[{h:'الوظيفة',w:30,wrap:1},{h:'سنوات الخبرة'},{h:'العدد'}],state.team.map(function(x){return [x.role||'',num(x.exp)||null,num(x.count)]}),function(a,b){return ['الإجمالي','',F('SUM(C'+a+':C'+b+')')]});
     if(on('equip'))sub2('المعدات والأدوات',[{h:'المعدة',w:30,wrap:1},{h:'العدد'},{h:'ملاحظات',w:13,wrap:1}],state.equip.map(function(x){return [x.name||'',num(x.count),x.notes||'']}),function(a,b){return ['الإجمالي',F('SUM(B'+a+':B'+b+')'),'']});
-    if(on('rates'))sub2('معدلات الإنتاج وتوزيع الفرق',[{h:'القطر',w:30},{h:'عدد المجموعات'},{h:'أفراد / مجموعة'},{h:'المستهدف اليومي / مجموعة'},{h:'الإجمالي اليومي'},{h:'الكمية'},{h:'المدة (يوم)'}],function(a){return state.rates.map(function(x,i){var b=boqById(x.boq),q=b?num(b.qty):0,rr=a+i;return [boqName(x.boq),num(x.crews),num(x.per),num(x.daily),F('B'+rr+'*D'+rr,num(x.crews)*num(x.daily)),q,F('IF(E'+rr+'>0,ROUNDUP(F'+rr+'/E'+rr+',0),0)',rateDur(x))]})},function(a,b){return ['إجمالي أيام العمل','','','','','',F('SUM(G'+a+':G'+b+')')]});
+    if(on('rates'))sub2('معدلات الإنتاج وتوزيع الفرق',[{h:TM('itemCol'),w:30},{h:'عدد المجموعات'},{h:'أفراد / مجموعة'},{h:'المستهدف اليومي / مجموعة'},{h:'الإجمالي اليومي'},{h:'الكمية'},{h:'المدة (يوم)'}],function(a){return state.rates.map(function(x,i){var b=boqById(x.boq),q=b?num(b.qty):0,rr=a+i;return [boqName(x.boq),num(x.crews),num(x.per),num(x.daily),F('B'+rr+'*D'+rr,num(x.crews)*num(x.daily)),q,F('IF(E'+rr+'>0,ROUNDUP(F'+rr+'/E'+rr+',0),0)',rateDur(x))]})},function(a,b){return ['إجمالي أيام العمل','','','','','',F('SUM(G'+a+':G'+b+')')]});
   }
   if(on('risks')||on('conditions')){
     ws=xSheet(W,'المخاطر والشروط','سجل المخاطر وشروط مجال العمل',[{w:6},{w:34},{w:12},{w:42},{w:48}],{noFreeze:true,noHead:true});r=4;
@@ -414,7 +414,7 @@ function exportXlsx(full){
 /* ================= edit timeline: every change is kept as a reversible diff ================= */
 var TL={entries:[],pos:0,pending:null,cap:DESK?3000:400,loaded:false,chain:Promise.resolve()};
 var TLKEY=KEY+'-timeline';
-var TLNAMES={boq:'حصر الأعمال',groups:'مجموعات الجدول',tasks:'الجدول الزمني',events:'الإيقاف والمدد',installs:'المحابس المركبة',supplies:'التوريدات',expenses:'المصاريف',sections:'خطة العمل',team:'فريق العمل',equip:'المعدات',rates:'معدلات الإنتاج',risks:'المخاطر',conditions:'الشروط'};
+var TLNAMES={boq:'حصر الأعمال',groups:'مجموعات الجدول',tasks:'الجدول الزمني',events:'الإيقاف والمدد',installs:'سجل التنفيذ',supplies:'التوريدات',expenses:'المصاريف',sections:'خطة العمل',team:'فريق العمل',equip:'المعدات',rates:'معدلات الإنتاج',risks:'المخاطر',conditions:'الشروط'};
 function tlDocs(){var d=dbDocs(),m={};Object.keys(d).forEach(function(p){m[p]={b:d[p],j:canon(d[p])}});return m}
 function tlLabel(ch){
   var g={},out=[];
