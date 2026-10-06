@@ -363,7 +363,7 @@ var dnum=function(iso){return Math.round(Date.parse(iso+'T00:00:00Z')/DAY)};
 var fDate=new Intl.DateTimeFormat('ar-u-nu-latn-ca-gregory',{day:'numeric',month:'long',year:'numeric',timeZone:'UTC'});
 var fd=function(n){return fDate.format(new Date(n*DAY))};
 function todayNum(){var d=new Date();return Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())/DAY}
-var HOST=(function(h){return h&&typeof h.use==='function'?h:null})(window['cl'+'aude']);
+var HOST=null;
 var DRAFT_KEY='kkmc-remaining-plan-draft-v1', UI_KEY='kkmc-remaining-plan-ui-v1';
 var TITLE='محطات رفع حفر الباطن';
 function L(k){return esc(state.meta.labels[k]||DEF_LABELS[k]||'')}
