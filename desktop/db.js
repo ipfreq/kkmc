@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS records(
   PRIMARY KEY(project, coll, id));
 CREATE TABLE IF NOT EXISTS kv(key TEXT PRIMARY KEY, value TEXT);
 `;
-const COLLS = ['doc', 'boq', 'groups', 'tasks', 'events', 'installs', 'supplies', 'expenses', 'sections', 'team', 'equip', 'rates', 'risks', 'conditions'];
+const COLLS = ['doc', 'history', 'boq', 'groups', 'tasks', 'events', 'installs', 'supplies', 'expenses', 'sections', 'team', 'equip', 'rates', 'risks', 'conditions'];
 const DAY = 864e5;
 
 class Store {
@@ -203,7 +203,7 @@ class Store {
     const end = dn(meta.end), start = dn(meta.start);
     return {
       name: meta.name, short: meta.short, client: meta.client, po: meta.po, currency: meta.currency || '',
-      qty, inst, sup, expenses: sum(rows.expenses, 'amount'),
+      qty, inst, sup, expenses: (rows.expenses || []).reduce((t, x) => { const n = num(x.qty) && num(x.price) ? num(x.qty) * num(x.price) : num(x.amount); return t + n * (1 + num(x.vat) / 100); }, 0),
       start: isNaN(start) ? null : start * DAY, end: isNaN(end) ? null : end * DAY,
       revEnd: isNaN(end) ? null : (end + adds) * DAY, adds,
       ongoingStop: (rows.events || []).some(e => e.type === 'stop' && e.from && !e.to),
