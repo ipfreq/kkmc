@@ -1,7 +1,7 @@
 {
   "name": "project-tracker",
   "productName": "Project Tracker",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "متابعة المشاريع – برنامج متابعة مشاريع المقاولات",
   "author": {
     "name": "Yasser Mohamed Abdelgaber",
@@ -62,7 +62,13 @@
       "license": "LICENSE.txt",
       "installerIcon": "build/icon.ico",
       "uninstallerIcon": "build/icon.ico",
-      "deleteAppDataOnUninstall": false
+      "deleteAppDataOnUninstall": false,
+      "installerLanguages": [
+        "ar_SA"
+      ],
+      "language": "1025",
+      "displayLanguageSelector": false,
+      "unicode": true
     }
   }
 }
