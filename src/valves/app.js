@@ -227,11 +227,14 @@ function kpiHtml(){
   '</div>';
 }
 var TABS=[['dash','لوحة المتابعة'],['boq','حصر الأعمال'],['gantt','الجدول الزمني'],['installs','المحابس المركبة'],['supplies','التوريدات'],['expenses','المصاريف'],['events','الإيقاف والمدد'],['plan','خطة العمل'],['report','التقرير / PDF'],['settings','بيانات المشروع']];
+function tabDefault(k){if(k==='installs')return TERMS[state.meta.kind==='works'?'works':'valves'].log;for(var i=0;i<TABS.length;i++)if(TABS[i][0]===k)return TABS[i][1];return k}
+function tabLabel(k){if(k==='installs')return TM('log');var n=String((state.meta.tabNames||{})[k]||'').trim();return n||tabDefault(k)}
+function renameTab(k,name){name=String(name||'').replace(/\s+/g,' ').trim();mutate(function(){if(k==='installs'){state.meta.terms=Object.assign({},state.meta.terms);state.meta.terms.log=name}else{state.meta.tabNames=Object.assign({},state.meta.tabNames);if(name)state.meta.tabNames[k]=name;else delete state.meta.tabNames[k]}})}
 function tabHidden(k){return k!=='dash'&&k!=='settings'&&(state.meta.hiddenTabs||[]).indexOf(k)>=0}
 function renderTabs(){
   if(tabHidden(ui.tab))ui.tab='dash';
   var cnt={installs:state.installs.length,supplies:state.supplies.length,expenses:state.expenses.length,events:state.events.length};
-  $('#tabs').innerHTML=TABS.filter(function(t){return !tabHidden(t[0])}).map(function(t){return '<button role="tab" aria-selected="'+(ui.tab===t[0])+'" data-act="tab" data-v="'+t[0]+'">'+(t[0]==='installs'?esc(TM('log')):t[1])+(cnt[t[0]]?'<span class="cnt">'+cnt[t[0]]+'</span>':'')+'</button>'}).join('');
+  $('#tabs').innerHTML=TABS.filter(function(t){return !tabHidden(t[0])}).map(function(t){return '<button role="tab" aria-selected="'+(ui.tab===t[0])+'" data-act="tab" data-v="'+t[0]+'" title="دبل كليك لتغيير الاسم">'+esc(tabLabel(t[0]))+(cnt[t[0]]?'<span class="cnt">'+cnt[t[0]]+'</span>':'')+'</button>'}).join('');
 }
 
 /* ================= binding helpers ================= */
@@ -576,7 +579,7 @@ function renderSettings(p){
   p.innerHTML='<div class="card"><h2>بيانات المشروع</h2><div class="fields">'+fld('meta','name','اسم المشروع','text',{wide:1})+fld('meta','short','الاسم المختصر (لترويسة التقرير)')+fld('meta','client','الجهة المالكة')+fld('meta','po','رقم أمر الشراء / العقد')+fld('meta','location','الموقع')+fld('meta','contractor','المقاول')+fld('meta','preparer','معد التقرير / مدير المشروع')+fld('meta','engineer','المهندس المشرف / المقيم')+'</div></div>'+
   '<div class="card"><h2>المسميات</h2><p class="hint">الكلمات المستخدمة في البرنامج والتقارير. اتركها فارغة لاستخدام الكلمات الظاهرة داخل الخانة.</p><div class="fields">'+
   ['log','unit','verb'].map(function(k){var lb={log:'اسم سجل التنفيذ',unit:'الوحدة (مفرد)',verb:'الفعل'}[k],base=TERMS[m.kind==='works'?'works':'valves'][k];return '<label class="f"><span>'+lb+'</span><input '+B('meta','','terms.'+k)+' value="'+esc((m.terms||{})[k]||'')+'" placeholder="'+esc(base)+'"></label>'}).join('')+'</div></div>'+
-  '<div class="card"><h2>التبويبات الظاهرة</h2><p class="hint">ألغِ علامة أي تبويب لإخفائه من هذا المشروع. البيانات لا تُحذف، ويمكن إظهار التبويب مرة أخرى في أي وقت.</p><div class="toolbar">'+TABS.filter(function(t){return t[0]!=='dash'&&t[0]!=='settings'}).map(function(t){return '<label class="chk"><input type="checkbox" data-tabshow="'+t[0]+'"'+(tabHidden(t[0])?'':' checked')+'>'+(t[0]==='installs'?esc(TM('log')):t[1])+'</label>'}).join('')+'</div></div>'+
+  '<div class="card"><h2>التبويبات</h2><p class="hint">غيّر اسم أي تبويب من الخانة بجانبه (أو بدبل كليك على التبويب نفسه)، واتركها فارغة للاسم الأصلي. ألغِ العلامة لإخفاء التبويب من هذا المشروع؛ البيانات لا تُحذف ويمكن إظهاره في أي وقت.</p><div class="tabs-cfg">'+TABS.map(function(t){var k=t[0],fixed=k==='dash'||k==='settings',cur=k==='installs'?String((m.terms||{}).log||''):String((m.tabNames||{})[k]||'');return '<div class="tab-row">'+(fixed?'<span class="chk" title="لا يمكن إخفاء هذا التبويب"><input type="checkbox" checked disabled></span>':'<label class="chk" title="إظهار التبويب"><input type="checkbox" data-tabshow="'+k+'"'+(tabHidden(k)?'':' checked')+' aria-label="إظهار '+esc(tabDefault(k))+'"></label>')+'<input class="in" data-tabname="'+k+'" value="'+esc(cur)+'" placeholder="'+esc(tabDefault(k))+'" aria-label="اسم تبويب '+esc(tabDefault(k))+'"></div>'}).join('')+'</div></div>'+
   '<div class="card"><h2>المدة والقيمة</h2><div class="fields">'+fld('meta','start','تاريخ بدء العقد','date')+fld('meta','end','تاريخ الانتهاء التعاقدي','date')+'<div class="f"><span>المدة الأصلية</span><b class="num" style="padding:6px 0">'+(cEnd()-cStart()+1)+' يوماً تقويمياً</b></div>'+fld('meta','value','قيمة العقد قبل الضريبة (إن لم تُدخل أسعار الوحدات)','number')+fld('meta','vat','ضريبة القيمة المضافة %','number')+fld('meta','currency','العملة')+fld('meta','supplyPct','نسبة احتساب الكميات الموردة غير المنفذة من قيمة البند %','number')+'</div>'+
   '<div class="f"><span>أيام العطلة الأسبوعية (لا يُحسب فيها عمل في الجدول)</span><div class="toolbar">'+DOWS.map(function(d,i){return '<label class="chk"><input type="checkbox" data-wk="'+i+'"'+(m.weekend.indexOf(i)>=0?' checked':'')+'>'+d+'</label>'}).join('')+'</div></div></div>'+
   '<div class="card"><h2>الشعار</h2><div class="toolbar">'+(logoSrc()?'<img src="'+logoSrc()+'" alt="" style="height:60px;background:#fff;border-radius:6px;padding:2px">':'')+'<label class="btn">تغيير الشعار<input type="file" accept="image/*" data-act-logo hidden></label>'+(m.logo?'<button class="btn" data-act="logo-reset">استعادة الشعار الافتراضي</button>':'')+'</div></div>'+
@@ -587,6 +590,7 @@ function renderSettings(p){
 }
 document.addEventListener('change',function(e){
   var t=e.target;
+  if(t.hasAttribute('data-tabname')){renameTab(t.getAttribute('data-tabname'),t.value);return}
   if(t.hasAttribute('data-tabshow')){var k=t.getAttribute('data-tabshow');mutate(function(){var h=(state.meta.hiddenTabs||[]).filter(function(x){return x!==k});if(!t.checked)h.push(k);state.meta.hiddenTabs=h});return}
   if(t.hasAttribute('data-wk')){var i=+t.getAttribute('data-wk');mutate(function(){var w=state.meta.weekend.filter(function(x){return x!==i});if(t.checked)w.push(i);w.sort();if(w.length>=7)w=[5];state.meta.weekend=w});return}
   if(t.hasAttribute('data-act-logo')&&t.files[0]){var fr=new FileReader();fr.onload=function(){shrink(fr.result,600,function(u){mutate(function(){state.meta.logo=u})})};fr.readAsDataURL(t.files[0]);return}
@@ -805,7 +809,7 @@ document.addEventListener('click',function(e){
   var b=e.target.closest('[data-act]');if(!b)return;var a=b.getAttribute('data-act'),v=b.getAttribute('data-v'),c=b.getAttribute('data-c'),id=b.getAttribute('data-id');
   if(b.tagName==='INPUT'||b.tagName==='TEXTAREA')return;
   switch(a){
-    case 'tab':ui.tab=v;saveUi();closeDlg();renderAll();window.scrollTo(0,0);break;
+    case 'tab':if(v===ui.tab)break;ui.tab=v;saveUi();closeDlg();renderAll();window.scrollTo(0,0);break;
     case 'undo':undo();break;case 'redo':redo();break;
     case 'save-html':saveHtml();break;
     case 'export-json':offerFile(fname('json'),JSON.stringify(state,null,1));break;
@@ -847,6 +851,12 @@ document.addEventListener('click',function(e){
     case 'logo-reset':mutate(function(){state.meta.logo=''});break;
     case 'reset':ask('استعادة الخطة الافتراضية؟ سيتم حذف كل السجلات والتعديلات (يمكنك التراجع مباشرة بعدها).','استعادة',true).then(function(ok){if(!ok)return;snap();state=normalize(DEFAULT_PROJECT());initBaseline();saveDraft();sched();renderAll();toast('تمت الاستعادة')});break;
   }
+});
+document.addEventListener('dblclick',function(e){
+  var b=e.target.closest&&e.target.closest('#tabs [data-v]'),k=b?b.getAttribute('data-v'):(e.target.closest&&e.target.closest('#tabs')?ui.tab:null);if(!k)return;
+  openDlg('<div class="dlg-h"><h2>تغيير اسم التبويب</h2><button type="button" class="btn icon ghost" data-act="close-dlg" aria-label="إغلاق">✕</button></div><label class="f"><span>الاسم الجديد</span><input name="tname" value="'+esc(tabLabel(k))+'" placeholder="'+esc(tabDefault(k))+'"></label><p class="hint">اترك الخانة فارغة للرجوع للاسم الأصلي: '+esc(tabDefault(k))+'</p><div class="dlg-f"><span></span><div class="toolbar"><button type="button" class="btn" data-act="close-dlg">إلغاء</button><button class="btn primary" value="ok">حفظ الاسم</button></div></div>',
+  function(f){var v=f.elements.tname.value.trim();renameTab(k,v===tabDefault(k)?'':v);toast('تم تغيير اسم التبويب')});
+  var i=$('#dlg input[name=tname]');if(i)i.select();
 });
 document.addEventListener('keydown',function(e){if((e.ctrlKey||e.metaKey)&&!e.altKey&&(e.key==='z'||e.key==='Z')){var tg=e.target.tagName;if(tg==='INPUT'||tg==='TEXTAREA')return;e.preventDefault();e.shiftKey?redo():undo()}});
 window.addEventListener('beforeunload',function(){cacheLocal();if(DB.timer){clearTimeout(DB.timer);DB.timer=0;dbFlush()}});
