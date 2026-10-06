@@ -65,7 +65,7 @@
     });
     document.querySelectorAll('[data-act=filter]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-v') === view)); });
     $('#grid').innerHTML = shown.length ? shown.map(card).join('') : (view === 'active' && !q && !act.length ?
-      '<div class="empty"><h2>لا توجد مشاريع بعد</h2><p>ابدأ مشروعاً جديداً من قالب مشروع المحابس، أو استورد ملف مشروع (JSON) أو ملف Excel كامل من النسخة السابقة.</p><div class="actions"><button class="btn primary" data-act="new">+ مشروع جديد</button><button class="btn" data-act="import">استيراد مشروع من ملف</button></div></div>' :
+      '<div class="empty"><h2>لا توجد مشاريع بعد</h2><p>ابدأ مشروعاً جديداً، أو استورد ملف مشروع (JSON) أو ملف Excel كامل.</p><div class="actions"><button class="btn primary" data-act="new">+ مشروع جديد</button><button class="btn" data-act="import">استيراد مشروع من ملف</button></div></div>' :
       '<div class="empty"><p>' + (q ? 'لا توجد مشاريع مطابقة للبحث.' : 'لا توجد مشاريع مؤرشفة.') + '</p></div>');
   }
 
@@ -85,13 +85,12 @@
   }
 
   function newProject() {
-    dialog('<h2>مشروع جديد</h2><label class="f">اسم المشروع<input class="in" name="name" required value="مشروع توريد وتركيب محابس"></label>' +
-      '<label class="opt"><input type="radio" name="tpl" value="kkmc" checked><div><b>قالب مشروع المحابس الكامل</b><span>البنود التسعة، الجدول الزمني المعتمد، خطة العمل، فريق العمل والمعدات، الشروط. تعدّل أي شيء بعدها.</span></div></label>' +
-      '<label class="opt"><input type="radio" name="tpl" value="blank"><div><b>مشروع جديد فارغ (أي نوع أعمال)</b><span>نفس الأقسام: لوحة المتابعة، حصر الأعمال، الجدول الزمني، الأعمال المنفذة، التوريدات، المصاريف، الإيقاف والمدد، خطة العمل، التقرير. بدون بنود، تضيفها بنفسك.</span></div></label>' +
+    dialog('<h2>مشروع جديد</h2><label class="f">اسم المشروع<input class="in" name="name" required placeholder="مثال: توريد وتركيب مضخات محطة حي بدر"></label>' +
+      '<p class="meta" style="margin:0">يُنشأ المشروع بكل الأقسام: لوحة المتابعة، حصر الأعمال، الجدول الزمني، البنود المركبة، التوريدات، المصاريف، الإيقاف والمدد، خطة العمل، التقرير، بيانات المشروع.</p>' +
       '<div class="dlg-f"><button type="button" class="btn" data-close>إلغاء</button><button class="btn primary">إنشاء وفتح المشروع</button></div>',
     function (f) {
-      var name = f.elements.name.value.trim(), tpl = f.elements.tpl.value;
-      api.create(name, 'valves').then(function (id) { go(id, '&name=' + encodeURIComponent(name) + (tpl === 'blank' ? '&blank=1' : '')); });
+      var name = f.elements.name.value.trim();
+      api.create(name, 'valves').then(function (id) { go(id, '&name=' + encodeURIComponent(name) + '&blank=1'); });
     });
   }
 
@@ -151,7 +150,7 @@
     }).catch(function () { return false; });
   }
   migratePlans().then(function (moved) {
-    if (moved) toast('تم نقل خطط محطات الرفع إلى مشاريع بنفس أقسام مشروع المحابس. النسخة الأصلية محفوظة في «المؤرشفة».');
+    if (moved) toast('تم نقل خطط محطات الرفع إلى مشاريع بكل الأقسام. النسخة الأصلية محفوظة في «المؤرشفة».');
     load();
   });
 })();

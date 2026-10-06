@@ -71,7 +71,9 @@ function dbInit(){
         var d0=todayNum();
         state.meta=Object.assign(state.meta,{client:'',po:'',location:'',engineer:'',value:'',start:iso(d0),end:iso(d0+179),kind:'works',terms:{}});
         ['boq','installs','supplies','expenses','events','sections','team','equip','rates','risks','conditions'].forEach(function(k){state[k]=[]});
-        state.tasks=state.tasks.filter(function(t){return t.ms}).map(function(t){t.preds=[];t.nb=t.code==='A1000'?iso(d0):'';t.bs='';t.bf='';return t});
+        state.groups=[{id:'g1',name:'المواعيد التعاقدية',color:0},{id:'g2',name:'الأعمال التحضيرية والاعتمادات',color:1},{id:'g3',name:'التوريد',color:2},{id:'g4',name:'التنفيذ والتركيب',color:4}];
+        state.expCats=['مواد ومستلزمات','مسامير وجوانات وفلنجات','مواد مدنية وأسفلت','عمالة ويوميات','معدات وإيجارات','نقل ومحروقات','إعاشة وسكن','رسوم وتصاريح','أخرى'];
+        state.tasks=state.tasks.filter(function(t){return t.ms}).map(function(t){t.preds=[];t.nb=t.code==='A1000'?iso(d0):iso(d0+179);t.bs='';t.bf='';return t});
         initBaseline();
       }
       if(!any&&HOST.newName){state.meta.name=HOST.newName;state.meta.short=HOST.newName}
