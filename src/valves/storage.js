@@ -9,7 +9,7 @@ function ask(msg,okTxt,danger){
 /* ================= host runtime (only present when the page is opened as a published page) ================= */
 var HOST=(window.PLAN_HOST&&typeof window.PLAN_HOST.use==='function')?window.PLAN_HOST:null;
 var DL=null;
-function canPrint(){return !HOST}
+function canPrint(){return !HOST||!!HOST.print}
 
 /* ================= shared database (published page) ================= */
 var DBCOLS=['boq','groups','tasks','events','installs','supplies','expenses','sections','team','equip','rates','risks','conditions'];
@@ -66,11 +66,20 @@ function dbInit(){
         if(!snaps[0].docs.length)state.meta=cur.meta;
         state=normalize(state);
         hist=[];fut=[];
+        if(!state.tasks.some(function(t){return t.bs})){initBaseline();any=false}
+      }else if(HOST.blank){
+        var d0=todayNum();
+        state.meta=Object.assign(state.meta,{client:'',po:'',location:'',engineer:'',value:'',start:iso(d0),end:iso(d0+179)});
+        ['boq','installs','supplies','expenses','events','sections','team','equip','rates','risks','conditions'].forEach(function(k){state[k]=[]});
+        state.tasks=state.tasks.filter(function(t){return t.ms}).map(function(t){t.preds=[];t.nb=t.code==='A1000'?iso(d0):'';t.bs='';t.bf='';return t});
+        initBaseline();
       }
+      if(!any&&HOST.newName){state.meta.name=HOST.newName;state.meta.short=HOST.newName}
       DB.on=true;DB.status='ok';
       cacheLocal();sched();renderAll();
       cols.forEach(function(c){db.collection(c).onSnapshot(function(s){onRemote(c,s)},function(e){if(e&&e.code==='revoked'){DB.on=false;DB.status='off';renderStatus()}})});
       if(!any)dbQueue();
+      if(HOST.takeImport)HOST.takeImport().then(function(f){if(!f)return;var p=/\.xlsx$/i.test(f.name)?readXlsxState(f.bytes.buffer||f.bytes):Promise.resolve().then(function(){var o=JSON.parse(new TextDecoder().decode(f.bytes));return o&&o.state?o.state:o});return p.then(function(o){if(!o||!o.meta||!o.boq){toast('الملف لا يحتوي على بيانات مشروع صالحة');return}state=normalize(o);hist=[];fut=[];saveDraft();sched();renderAll();toast('تم استيراد المشروع من الملف')})}).catch(function(){toast('تعذّر قراءة الملف')});
     });
   }).catch(function(){DB.status='error';DB.err='تعذّر الاتصال بقاعدة البيانات. التعديلات محفوظة في هذا المتصفح.';renderStatus()});
 }
@@ -90,7 +99,8 @@ function onRemote(c,snap){
   });
   if(changed){Object.keys(touched).forEach(resort);cacheLocal();sched();renderSoon()}
 }
-function dbQueue(){if(!DB.on||DB.ro)return;clearTimeout(DB.timer);DB.status='pending';renderStatus();DB.timer=setTimeout(function(){DB.timer=0;dbFlush()},600)}
+function dbQueue(){if(!DB.on||DB.ro)return;clearTimeout(DB.timer);DB.status='pending';renderStatus();DB.timer=setTimeout(function(){DB.timer=0;dbFlush()},DESK?150:600)}
+function dbSettle(){if(!DB.on)return Promise.resolve();if(DB.timer){clearTimeout(DB.timer);DB.timer=0;dbFlush()}return new Promise(function(res){var n=0;(function wait(){if((!DB.busy&&!DB.timer&&!DB.again)||n++>100)res();else setTimeout(wait,50)})()})}
 function dbFlush(){
   if(DB.busy){DB.again=true;return}
   var want=dbDocs(),ops=[];
@@ -165,7 +175,7 @@ function fdbWrite(){
 function fdbBoot(){if(!fdbSupported())return;idbGet('fdb').then(function(h){if(!h)return;FDB.handle=h;FDB.name=h.name;FDB.status='perm';renderAll()})}
 
 /* ================= change hook + status ================= */
-function cacheLocal(){ls(function(){localStorage.setItem(KEY,JSON.stringify({rev:state.rev,at:Date.now(),state:state}))})}
+function cacheLocal(){if(DESK)return;ls(function(){localStorage.setItem(KEY,JSON.stringify({rev:state.rev,at:Date.now(),state:state}))})}
 function afterChange(){if(DB.on)dbQueue();if(FDB.handle)fdbQueue()}
 function hm(t){var d=new Date(t);return pad(d.getHours())+':'+pad(d.getMinutes())}
 function storageChip(){
@@ -181,6 +191,9 @@ function storageChip(){
 }
 function renderStatus(){var s=$('#store-status');if(s)s.innerHTML=storageChip()}
 function storageCard(){
+  if(DESK){
+    return '<div class="card"><h2>قاعدة البيانات</h2><p class="hint">بيانات كل المشاريع محفوظة في ملف قاعدة بيانات واحد على جهازك، وكل تعديل يُحفظ فيه فوراً. يُعمل نسخة احتياطية تلقائية كل يوم.</p><dl class="facts"><dt>الحالة</dt><dd>'+storageChip()+'</dd><dt>مكان الملف</dt><dd class="num" id="db-path" style="direction:ltr;text-align:right">…</dd></dl><div class="toolbar"><button class="btn" data-act="desk-backup">نسخة احتياطية الآن</button><button class="btn" data-act="desk-folder">فتح مجلد البيانات</button><button class="btn" data-act="xlsx-full">تحميل نسخة Excel كاملة</button></div></div>';
+  }
   if(HOST){
     var st=DB.on?(DB.ro?'متصلة (عرض فقط لهذا الحساب)':'متصلة – كل تعديل يُحفظ فوراً ويظهر على أي جهاز تفتح منه الصفحة'):DB.status==='loading'?'جارٍ الاتصال…':'غير متاحة في هذا العرض – التعديلات تُحفظ في هذا المتصفح';
     return '<div class="card"><h2>قاعدة البيانات</h2><p class="hint">بيانات المشروع محفوظة في قاعدة بيانات الصفحة، في جداول مثل شيت Excel: البنود، المهام، المحابس المركبة، التوريدات، المصاريف، الإيقاف والمدد، وأقسام خطة العمل.</p><dl class="facts"><dt>الحالة</dt><dd>'+esc(st)+'</dd>'+(DB.at?'<dt>آخر حفظ</dt><dd>'+hm(DB.at)+'</dd>':'')+'</dl><div class="toolbar"><button class="btn primary" data-act="xlsx-full">تحميل نسخة Excel كاملة من قاعدة البيانات</button></div></div>';

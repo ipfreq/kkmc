@@ -1,0 +1,68 @@
+{
+  "name": "project-tracker",
+  "productName": "Project Tracker",
+  "version": "1.0.0",
+  "description": "متابعة المشاريع – برنامج متابعة مشاريع المقاولات",
+  "author": {
+    "name": "Yasser Mohamed Abdelgaber",
+    "email": "ipfreq@gmail.com"
+  },
+  "license": "UNLICENSED",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "prepare-pages": "python3 ../src/valves/build.py --desktop renderer",
+    "start": "electron .",
+    "dist": "electron-builder --win --x64 --publish never"
+  },
+  "dependencies": {
+    "sql.js": "1.14.2"
+  },
+  "devDependencies": {
+    "electron": "38.8.6",
+    "electron-builder": "26.15.3"
+  },
+  "build": {
+    "appId": "com.yasser.projecttracker",
+    "productName": "Project Tracker",
+    "copyright": "Copyright © 2026 Yasser Mohamed Abdelgaber. All rights reserved.",
+    "artifactName": "ProjectTracker-Setup-${version}.${ext}",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "db.js",
+      "renderer/**",
+      "build/icon.png",
+      "LICENSE.txt",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "legalTrademarks": "Project Tracker – Yasser Mohamed Abdelgaber"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Project Tracker",
+      "license": "LICENSE.txt",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "deleteAppDataOnUninstall": false
+    }
+  }
+}

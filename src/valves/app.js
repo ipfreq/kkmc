@@ -35,7 +35,8 @@ var ASSETS=ls(function(){return JSON.parse($('#assets').textContent)})||{};
 
 /* ================= state ================= */
 var EMB=ls(function(){var t=$('#app-data');return t&&t.textContent.trim()?JSON.parse(t.textContent):null});
-var saved=ls(function(){return JSON.parse(localStorage.getItem(KEY)||'null')});
+var DESK=!!(window.PLAN_HOST&&window.PLAN_HOST.desktop);
+var saved=DESK?null:ls(function(){return JSON.parse(localStorage.getItem(KEY)||'null')});
 var state,dirty=false;
 if(saved&&saved.state&&(!EMB||(saved.rev||0)>=(EMB.rev||0))){state=saved.state;dirty=!EMB||JSON.stringify(saved.state)!==JSON.stringify(EMB)}
 else state=EMB||DEFAULT_PROJECT();
@@ -173,9 +174,9 @@ function logoSrc(){return state.meta.logo||ASSETS.logo||''}
 function renderHeader(){
   var m=state.meta,lg=logoSrc();
   $('#hdr').innerHTML='<div class="brand">'+(lg?'<img src="'+lg+'" alt="">':'')+'<div class="tx"><span class="eyebrow">'+esc(m.contractor)+'</span><h1>'+esc(m.name)+'</h1><span class="sub">'+esc(m.client)+(m.po?' · أمر الشراء رقم <span class="num">'+esc(m.po)+'</span>':'')+'</span></div></div>'+
-  '<div class="actions"><span id="store-status" class="actions">'+storageChip()+'</span>'+
+  '<div class="actions">'+(HOST&&HOST.home?'<button class="btn sm" data-act="home">→ كل المشاريع</button>':'')+'<span id="store-status" class="actions">'+storageChip()+'</span>'+
   '<button class="btn sm" data-act="undo" title="تراجع (Ctrl+Z)">↶ تراجع</button><button class="btn sm" data-act="redo" title="إعادة (Ctrl+Shift+Z)">↷ إعادة</button>'+
-  '<button class="btn sm" data-act="save-html">حفظ نسخة HTML محدّثة</button><button class="btn sm" data-act="xlsx">Excel منسق</button><button class="btn sm primary" data-act="tab" data-v="report">التقرير / PDF</button></div>';
+  (DESK?'':'<button class="btn sm" data-act="save-html">حفظ نسخة HTML محدّثة</button>')+'<button class="btn sm" data-act="xlsx">Excel منسق</button><button class="btn sm primary" data-act="tab" data-v="report">التقرير / PDF</button></div>';
 }
 function renderBanners(){
   var out=[],td=todayNum();
@@ -500,7 +501,9 @@ function renderSettings(p){
   '<div class="f"><span>أيام العطلة الأسبوعية (لا يُحسب فيها عمل في الجدول)</span><div class="toolbar">'+DOWS.map(function(d,i){return '<label class="chk"><input type="checkbox" data-wk="'+i+'"'+(m.weekend.indexOf(i)>=0?' checked':'')+'>'+d+'</label>'}).join('')+'</div></div></div>'+
   '<div class="card"><h2>الشعار</h2><div class="toolbar">'+(logoSrc()?'<img src="'+logoSrc()+'" alt="" style="height:60px;background:#fff;border-radius:6px;padding:2px">':'')+'<label class="btn">تغيير الشعار<input type="file" accept="image/*" data-act-logo hidden></label>'+(m.logo?'<button class="btn" data-act="logo-reset">استعادة الشعار الافتراضي</button>':'')+'</div></div>'+
   storageCard()+'<div class="card"><h2>الحفظ والنقل</h2><p class="hint">التعديلات تُحفظ تلقائياً في هذا المتصفح. لنسخة دائمة أو لنقلها لجهاز آخر: «حفظ نسخة HTML محدّثة» يحمّل ملف الصفحة كاملاً بكل بياناتك (افتحه بدل القديم)، و«تصدير ملف المشروع» يحمّل ملف بيانات JSON يمكن فتحه لاحقاً.</p><div class="toolbar"><button class="btn primary" data-act="save-html">حفظ نسخة HTML محدّثة</button><button class="btn" data-act="export-json">تصدير ملف المشروع (JSON)</button><label class="btn">فتح ملف مشروع (JSON أو Excel)<input type="file" accept=".json,.xlsx,application/json" data-act-import hidden></label><button class="btn" data-act="csv" data-v="installs">CSV المحابس</button><button class="btn" data-act="csv" data-v="supplies">CSV التوريدات</button><button class="btn" data-act="csv" data-v="expenses">CSV المصاريف</button><span class="grow"></span><button class="btn danger" data-act="reset">استعادة الخطة الافتراضية</button></div></div>'+
-  '<div class="card"><h2>المظهر</h2><div class="seg">'+[['','تلقائي'],['light','فاتح'],['dark','داكن']].map(function(x){return '<button data-act="theme" data-v="'+x[0]+'" aria-pressed="'+((document.documentElement.getAttribute('data-theme')||'')===x[0])+'">'+x[1]+'</button>'}).join('')+'</div></div>';
+  '<div class="card"><h2>المظهر</h2><div class="seg">'+[['','تلقائي'],['light','فاتح'],['dark','داكن']].map(function(x){return '<button data-act="theme" data-v="'+x[0]+'" aria-pressed="'+((document.documentElement.getAttribute('data-theme')||'')===x[0])+'">'+x[1]+'</button>'}).join('')+'</div></div>'+
+  '<div class="card"><h2>عن البرنامج</h2><dl class="facts"><dt>البرنامج</dt><dd>متابعة المشاريع – توريد وتركيب المحابس</dd><dt>تصميم وبرمجة</dt><dd>م. ياسر محمد عبدالجابر</dd><dt>الإصدار</dt><dd class="num" id="app-ver">'+(DESK?'…':'نسخة المتصفح')+'</dd><dt>حقوق الطبع</dt><dd>© '+Math.max(2026,new Date().getFullYear())+' م. ياسر محمد عبدالجابر. جميع الحقوق محفوظة. لا يجوز نسخ البرنامج أو توزيعه أو تعديله دون إذن كتابي من المؤلف.</dd></dl></div>';
+  if(DESK&&HOST.info)HOST.info().then(function(i){var a=$('#db-path');if(a)a.textContent=i.dbPath;var b=$('#app-ver');if(b)b.textContent=i.version})
 }
 document.addEventListener('change',function(e){
   var t=e.target;
@@ -664,6 +667,14 @@ function libs(){var p=[];if(!window.html2canvas)p.push(loadScript(CDN+'html2canv
 var busy=false;
 function exportPdf(){
   if(busy)return;busy=true;var pg=$('#pdf-prog');if(pg)pg.textContent='جارٍ تجهيز ملف PDF…';
+  if(HOST&&HOST.pdf){
+    fontsReady().then(function(){
+      var root=$('#print-root');root.innerHTML='';root.style.display='block';root.style.position='fixed';root.style.visibility='hidden';
+      buildPages(root);root.removeAttribute('style');
+      return HOST.pdf(fname('pdf'));
+    }).then(function(ok){if(ok)toast('تم حفظ ملف PDF')}).catch(function(){toast('تعذّر حفظ ملف PDF')}).then(function(){$('#print-root').innerHTML='';busy=false;if(pg)pg.textContent=''});
+    return;
+  }
   libs().then(fontsReady).then(function(){
     var host=el('div','rp-host');host.style.zIndex='-1';document.body.appendChild(host);
     var pages=buildPages(host),doc=new window.jspdf.jsPDF({orientation:'portrait',unit:'mm',format:'a4',compress:true}),i=0;
@@ -739,6 +750,9 @@ document.addEventListener('click',function(e){
     case 'clear-f':ui.f[c]={};saveUi();renderAll();break;
     case 'csv':exportCsv(v);break;
     case 'secs-all':mutate(function(){RSECS.forEach(function(s){state.report.secs[s[0]]=v==='1'})});break;
+    case 'desk-backup':HOST.backupNow().then(function(f){toast('تم حفظ نسخة احتياطية: '+f)}).catch(function(){toast('تعذّر عمل النسخة الاحتياطية')});break;
+    case 'desk-folder':HOST.openData();break;
+    case 'home':if(HOST&&HOST.home){cacheLocal();dbSettle().then(function(){HOST.home()})}break;
     case 'print':doPrint();break;case 'pdf':exportPdf();break;
     case 'xlsx':exportXlsx(false);break;case 'xlsx-full':exportXlsx(true);break;
     case 'fdb-create':fdbCreate();break;case 'fdb-open':fdbOpen();break;case 'fdb-resume':fdbResume();break;case 'fdb-save':fdbWrite();break;case 'fdb-detach':ask('فصل ملف Excel؟ ستتوقف الكتابة فيه، والتعديلات تُحفظ في المتصفح فقط.','فصل الملف').then(function(ok){if(ok)fdbDetach()});break;
@@ -748,7 +762,7 @@ document.addEventListener('click',function(e){
   }
 });
 document.addEventListener('keydown',function(e){if((e.ctrlKey||e.metaKey)&&!e.altKey&&(e.key==='z'||e.key==='Z')){var tg=e.target.tagName;if(tg==='INPUT'||tg==='TEXTAREA')return;e.preventDefault();e.shiftKey?redo():undo()}});
-window.addEventListener('beforeunload',function(){cacheLocal()});
+window.addEventListener('beforeunload',function(){cacheLocal();if(DB.timer){clearTimeout(DB.timer);DB.timer=0;dbFlush()}});
 
 /* ================= render ================= */
 var PANELS={dash:renderDash,boq:renderBoq,gantt:renderGantt,installs:renderInstalls,supplies:renderSupplies,expenses:renderExpenses,events:renderEvents,plan:renderPlan,report:renderReport,settings:renderSettings};
@@ -760,11 +774,12 @@ function renderAll(){
   if(key){var n=$('[data-b="'+key+'"],[data-f="'+key+'"]');if(n){n.focus({preventScroll:true});try{if(ss!=null&&n.setSelectionRange&&/text|search|textarea/.test(n.type))n.setSelectionRange(ss,se)}catch(err){}}}
   window.scrollTo(0,y);
 }
+var CREDIT='تصميم وبرمجة: م. ياسر محمد عبدالجابر · © '+Math.max(2026,new Date().getFullYear())+' جميع الحقوق محفوظة';
 function initBaseline(){sched();state.tasks.forEach(function(t){if(!t.bs){t.bs=iso(tS(t));t.bf=iso(tF(t))}})}
 /*@@MODULES@@*/
 (function boot(){
   var th=ls(function(){return localStorage.getItem(UIKEY+'-theme')});if(th)document.documentElement.setAttribute('data-theme',th);
-  $('#app').innerHTML='<header class="top" id="hdr"></header><div id="banners" style="display:flex;flex-direction:column;gap:8px"></div><nav class="tabs" id="tabs" role="tablist"></nav><main class="panel" id="panel"></main>';
+  $('#app').innerHTML='<header class="top" id="hdr"></header><div id="banners" style="display:flex;flex-direction:column;gap:8px"></div><nav class="tabs" id="tabs" role="tablist"></nav><main class="panel" id="panel"></main><footer class="credit">'+CREDIT+'</footer>';
   if(!state.tasks.some(function(t){return t.bs}))initBaseline();
   sched();renderAll();
   if(HOST){HOST.use('downloads').then(function(d){DL=d;renderAll()});dbInit()}

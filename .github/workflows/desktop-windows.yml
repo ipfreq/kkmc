@@ -1,0 +1,60 @@
+name: Desktop app – Windows installer
+
+on:
+  push:
+    branches: [shining-business-services-projects]
+    paths:
+      - 'desktop/**'
+      - 'src/valves/**'
+      - '.github/workflows/desktop-windows.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Build the program pages
+        run: python src/valves/build.py --desktop desktop/renderer
+
+      - name: Install dependencies
+        working-directory: desktop
+        run: npm ci
+
+      - name: Build the installer
+        working-directory: desktop
+        run: npx electron-builder --win --x64 --publish never
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ProjectTracker-Setup
+          path: desktop/dist/*.exe
+
+      - name: Publish the installer as a release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VER=$(node -p "require('./desktop/package.json').version")
+          TAG="desktop-v$VER"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" desktop/dist/*.exe --clobber
+          else
+            gh release create "$TAG" desktop/dist/*.exe --target "$GITHUB_SHA" \
+              --title "متابعة المشاريع – الإصدار $VER" \
+              --notes "ملف تسطيب برنامج متابعة المشاريع لويندوز 10 و11 (64-bit). تصميم وبرمجة م. ياسر محمد عبدالجابر. © 2026 جميع الحقوق محفوظة."
+          fi

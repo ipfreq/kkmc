@@ -1,4 +1,4 @@
-<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"></head><body><title>توريد وتركيب محابس البنية التحتية – مدينة الملك خالد العسكرية</title><style id="fonts">@font-face {
+<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="author" content="Yasser Mohamed Abdelgaber"><meta name="copyright" content="© 2026 Yasser Mohamed Abdelgaber. All rights reserved."></head><body><title>توريد وتركيب محابس البنية التحتية – مدينة الملك خالد العسكرية</title><style id="fonts">@font-face {
   font-family: 'IBM Plex Sans Arabic';
   font-style: normal;
   font-weight: 400;
@@ -342,6 +342,7 @@ dialog form{display:flex;flex-direction:column;gap:12px;padding:18px 20px}
 .pv>.rp{position:absolute;top:0;right:0;transform-origin:top right}
 .prog{font-size:12.5px;color:var(--muted)}
 
+.credit{margin-top:8px;padding-top:12px;border-top:1px solid var(--line);font-size:12px;color:var(--muted);text-align:center}
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-size:13.5px;z-index:60;box-shadow:0 6px 20px rgba(0,0,0,.25);max-width:calc(100vw - 32px);text-align:center}
 
 /* ---------- report pages (always light, A4 portrait 794x1123) ---------- */
@@ -1012,7 +1013,8 @@ var ASSETS=ls(function(){return JSON.parse($('#assets').textContent)})||{};
 
 /* ================= state ================= */
 var EMB=ls(function(){var t=$('#app-data');return t&&t.textContent.trim()?JSON.parse(t.textContent):null});
-var saved=ls(function(){return JSON.parse(localStorage.getItem(KEY)||'null')});
+var DESK=!!(window.PLAN_HOST&&window.PLAN_HOST.desktop);
+var saved=DESK?null:ls(function(){return JSON.parse(localStorage.getItem(KEY)||'null')});
 var state,dirty=false;
 if(saved&&saved.state&&(!EMB||(saved.rev||0)>=(EMB.rev||0))){state=saved.state;dirty=!EMB||JSON.stringify(saved.state)!==JSON.stringify(EMB)}
 else state=EMB||DEFAULT_PROJECT();
@@ -1150,9 +1152,9 @@ function logoSrc(){return state.meta.logo||ASSETS.logo||''}
 function renderHeader(){
   var m=state.meta,lg=logoSrc();
   $('#hdr').innerHTML='<div class="brand">'+(lg?'<img src="'+lg+'" alt="">':'')+'<div class="tx"><span class="eyebrow">'+esc(m.contractor)+'</span><h1>'+esc(m.name)+'</h1><span class="sub">'+esc(m.client)+(m.po?' · أمر الشراء رقم <span class="num">'+esc(m.po)+'</span>':'')+'</span></div></div>'+
-  '<div class="actions"><span id="store-status" class="actions">'+storageChip()+'</span>'+
+  '<div class="actions">'+(HOST&&HOST.home?'<button class="btn sm" data-act="home">→ كل المشاريع</button>':'')+'<span id="store-status" class="actions">'+storageChip()+'</span>'+
   '<button class="btn sm" data-act="undo" title="تراجع (Ctrl+Z)">↶ تراجع</button><button class="btn sm" data-act="redo" title="إعادة (Ctrl+Shift+Z)">↷ إعادة</button>'+
-  '<button class="btn sm" data-act="save-html">حفظ نسخة HTML محدّثة</button><button class="btn sm" data-act="xlsx">Excel منسق</button><button class="btn sm primary" data-act="tab" data-v="report">التقرير / PDF</button></div>';
+  (DESK?'':'<button class="btn sm" data-act="save-html">حفظ نسخة HTML محدّثة</button>')+'<button class="btn sm" data-act="xlsx">Excel منسق</button><button class="btn sm primary" data-act="tab" data-v="report">التقرير / PDF</button></div>';
 }
 function renderBanners(){
   var out=[],td=todayNum();
@@ -1477,7 +1479,9 @@ function renderSettings(p){
   '<div class="f"><span>أيام العطلة الأسبوعية (لا يُحسب فيها عمل في الجدول)</span><div class="toolbar">'+DOWS.map(function(d,i){return '<label class="chk"><input type="checkbox" data-wk="'+i+'"'+(m.weekend.indexOf(i)>=0?' checked':'')+'>'+d+'</label>'}).join('')+'</div></div></div>'+
   '<div class="card"><h2>الشعار</h2><div class="toolbar">'+(logoSrc()?'<img src="'+logoSrc()+'" alt="" style="height:60px;background:#fff;border-radius:6px;padding:2px">':'')+'<label class="btn">تغيير الشعار<input type="file" accept="image/*" data-act-logo hidden></label>'+(m.logo?'<button class="btn" data-act="logo-reset">استعادة الشعار الافتراضي</button>':'')+'</div></div>'+
   storageCard()+'<div class="card"><h2>الحفظ والنقل</h2><p class="hint">التعديلات تُحفظ تلقائياً في هذا المتصفح. لنسخة دائمة أو لنقلها لجهاز آخر: «حفظ نسخة HTML محدّثة» يحمّل ملف الصفحة كاملاً بكل بياناتك (افتحه بدل القديم)، و«تصدير ملف المشروع» يحمّل ملف بيانات JSON يمكن فتحه لاحقاً.</p><div class="toolbar"><button class="btn primary" data-act="save-html">حفظ نسخة HTML محدّثة</button><button class="btn" data-act="export-json">تصدير ملف المشروع (JSON)</button><label class="btn">فتح ملف مشروع (JSON أو Excel)<input type="file" accept=".json,.xlsx,application/json" data-act-import hidden></label><button class="btn" data-act="csv" data-v="installs">CSV المحابس</button><button class="btn" data-act="csv" data-v="supplies">CSV التوريدات</button><button class="btn" data-act="csv" data-v="expenses">CSV المصاريف</button><span class="grow"></span><button class="btn danger" data-act="reset">استعادة الخطة الافتراضية</button></div></div>'+
-  '<div class="card"><h2>المظهر</h2><div class="seg">'+[['','تلقائي'],['light','فاتح'],['dark','داكن']].map(function(x){return '<button data-act="theme" data-v="'+x[0]+'" aria-pressed="'+((document.documentElement.getAttribute('data-theme')||'')===x[0])+'">'+x[1]+'</button>'}).join('')+'</div></div>';
+  '<div class="card"><h2>المظهر</h2><div class="seg">'+[['','تلقائي'],['light','فاتح'],['dark','داكن']].map(function(x){return '<button data-act="theme" data-v="'+x[0]+'" aria-pressed="'+((document.documentElement.getAttribute('data-theme')||'')===x[0])+'">'+x[1]+'</button>'}).join('')+'</div></div>'+
+  '<div class="card"><h2>عن البرنامج</h2><dl class="facts"><dt>البرنامج</dt><dd>متابعة المشاريع – توريد وتركيب المحابس</dd><dt>تصميم وبرمجة</dt><dd>م. ياسر محمد عبدالجابر</dd><dt>الإصدار</dt><dd class="num" id="app-ver">'+(DESK?'…':'نسخة المتصفح')+'</dd><dt>حقوق الطبع</dt><dd>© '+Math.max(2026,new Date().getFullYear())+' م. ياسر محمد عبدالجابر. جميع الحقوق محفوظة. لا يجوز نسخ البرنامج أو توزيعه أو تعديله دون إذن كتابي من المؤلف.</dd></dl></div>';
+  if(DESK&&HOST.info)HOST.info().then(function(i){var a=$('#db-path');if(a)a.textContent=i.dbPath;var b=$('#app-ver');if(b)b.textContent=i.version})
 }
 document.addEventListener('change',function(e){
   var t=e.target;
@@ -1641,6 +1645,14 @@ function libs(){var p=[];if(!window.html2canvas)p.push(loadScript(CDN+'html2canv
 var busy=false;
 function exportPdf(){
   if(busy)return;busy=true;var pg=$('#pdf-prog');if(pg)pg.textContent='جارٍ تجهيز ملف PDF…';
+  if(HOST&&HOST.pdf){
+    fontsReady().then(function(){
+      var root=$('#print-root');root.innerHTML='';root.style.display='block';root.style.position='fixed';root.style.visibility='hidden';
+      buildPages(root);root.removeAttribute('style');
+      return HOST.pdf(fname('pdf'));
+    }).then(function(ok){if(ok)toast('تم حفظ ملف PDF')}).catch(function(){toast('تعذّر حفظ ملف PDF')}).then(function(){$('#print-root').innerHTML='';busy=false;if(pg)pg.textContent=''});
+    return;
+  }
   libs().then(fontsReady).then(function(){
     var host=el('div','rp-host');host.style.zIndex='-1';document.body.appendChild(host);
     var pages=buildPages(host),doc=new window.jspdf.jsPDF({orientation:'portrait',unit:'mm',format:'a4',compress:true}),i=0;
@@ -1716,6 +1728,9 @@ document.addEventListener('click',function(e){
     case 'clear-f':ui.f[c]={};saveUi();renderAll();break;
     case 'csv':exportCsv(v);break;
     case 'secs-all':mutate(function(){RSECS.forEach(function(s){state.report.secs[s[0]]=v==='1'})});break;
+    case 'desk-backup':HOST.backupNow().then(function(f){toast('تم حفظ نسخة احتياطية: '+f)}).catch(function(){toast('تعذّر عمل النسخة الاحتياطية')});break;
+    case 'desk-folder':HOST.openData();break;
+    case 'home':if(HOST&&HOST.home){cacheLocal();dbSettle().then(function(){HOST.home()})}break;
     case 'print':doPrint();break;case 'pdf':exportPdf();break;
     case 'xlsx':exportXlsx(false);break;case 'xlsx-full':exportXlsx(true);break;
     case 'fdb-create':fdbCreate();break;case 'fdb-open':fdbOpen();break;case 'fdb-resume':fdbResume();break;case 'fdb-save':fdbWrite();break;case 'fdb-detach':ask('فصل ملف Excel؟ ستتوقف الكتابة فيه، والتعديلات تُحفظ في المتصفح فقط.','فصل الملف').then(function(ok){if(ok)fdbDetach()});break;
@@ -1725,7 +1740,7 @@ document.addEventListener('click',function(e){
   }
 });
 document.addEventListener('keydown',function(e){if((e.ctrlKey||e.metaKey)&&!e.altKey&&(e.key==='z'||e.key==='Z')){var tg=e.target.tagName;if(tg==='INPUT'||tg==='TEXTAREA')return;e.preventDefault();e.shiftKey?redo():undo()}});
-window.addEventListener('beforeunload',function(){cacheLocal()});
+window.addEventListener('beforeunload',function(){cacheLocal();if(DB.timer){clearTimeout(DB.timer);DB.timer=0;dbFlush()}});
 
 /* ================= render ================= */
 var PANELS={dash:renderDash,boq:renderBoq,gantt:renderGantt,installs:renderInstalls,supplies:renderSupplies,expenses:renderExpenses,events:renderEvents,plan:renderPlan,report:renderReport,settings:renderSettings};
@@ -1737,6 +1752,7 @@ function renderAll(){
   if(key){var n=$('[data-b="'+key+'"],[data-f="'+key+'"]');if(n){n.focus({preventScroll:true});try{if(ss!=null&&n.setSelectionRange&&/text|search|textarea/.test(n.type))n.setSelectionRange(ss,se)}catch(err){}}}
   window.scrollTo(0,y);
 }
+var CREDIT='تصميم وبرمجة: م. ياسر محمد عبدالجابر · © '+Math.max(2026,new Date().getFullYear())+' جميع الحقوق محفوظة';
 function initBaseline(){sched();state.tasks.forEach(function(t){if(!t.bs){t.bs=iso(tS(t));t.bf=iso(tF(t))}})}
 /* ================= confirm dialog (the artifact viewer blocks window.confirm) ================= */
 function ask(msg,okTxt,danger){
@@ -1749,7 +1765,7 @@ function ask(msg,okTxt,danger){
 /* ================= host runtime (only present when the page is opened as a published page) ================= */
 var HOST=(window.PLAN_HOST&&typeof window.PLAN_HOST.use==='function')?window.PLAN_HOST:null;
 var DL=null;
-function canPrint(){return !HOST}
+function canPrint(){return !HOST||!!HOST.print}
 
 /* ================= shared database (published page) ================= */
 var DBCOLS=['boq','groups','tasks','events','installs','supplies','expenses','sections','team','equip','rates','risks','conditions'];
@@ -1806,11 +1822,20 @@ function dbInit(){
         if(!snaps[0].docs.length)state.meta=cur.meta;
         state=normalize(state);
         hist=[];fut=[];
+        if(!state.tasks.some(function(t){return t.bs})){initBaseline();any=false}
+      }else if(HOST.blank){
+        var d0=todayNum();
+        state.meta=Object.assign(state.meta,{client:'',po:'',location:'',engineer:'',value:'',start:iso(d0),end:iso(d0+179)});
+        ['boq','installs','supplies','expenses','events','sections','team','equip','rates','risks','conditions'].forEach(function(k){state[k]=[]});
+        state.tasks=state.tasks.filter(function(t){return t.ms}).map(function(t){t.preds=[];t.nb=t.code==='A1000'?iso(d0):'';t.bs='';t.bf='';return t});
+        initBaseline();
       }
+      if(!any&&HOST.newName){state.meta.name=HOST.newName;state.meta.short=HOST.newName}
       DB.on=true;DB.status='ok';
       cacheLocal();sched();renderAll();
       cols.forEach(function(c){db.collection(c).onSnapshot(function(s){onRemote(c,s)},function(e){if(e&&e.code==='revoked'){DB.on=false;DB.status='off';renderStatus()}})});
       if(!any)dbQueue();
+      if(HOST.takeImport)HOST.takeImport().then(function(f){if(!f)return;var p=/\.xlsx$/i.test(f.name)?readXlsxState(f.bytes.buffer||f.bytes):Promise.resolve().then(function(){var o=JSON.parse(new TextDecoder().decode(f.bytes));return o&&o.state?o.state:o});return p.then(function(o){if(!o||!o.meta||!o.boq){toast('الملف لا يحتوي على بيانات مشروع صالحة');return}state=normalize(o);hist=[];fut=[];saveDraft();sched();renderAll();toast('تم استيراد المشروع من الملف')})}).catch(function(){toast('تعذّر قراءة الملف')});
     });
   }).catch(function(){DB.status='error';DB.err='تعذّر الاتصال بقاعدة البيانات. التعديلات محفوظة في هذا المتصفح.';renderStatus()});
 }
@@ -1830,7 +1855,8 @@ function onRemote(c,snap){
   });
   if(changed){Object.keys(touched).forEach(resort);cacheLocal();sched();renderSoon()}
 }
-function dbQueue(){if(!DB.on||DB.ro)return;clearTimeout(DB.timer);DB.status='pending';renderStatus();DB.timer=setTimeout(function(){DB.timer=0;dbFlush()},600)}
+function dbQueue(){if(!DB.on||DB.ro)return;clearTimeout(DB.timer);DB.status='pending';renderStatus();DB.timer=setTimeout(function(){DB.timer=0;dbFlush()},DESK?150:600)}
+function dbSettle(){if(!DB.on)return Promise.resolve();if(DB.timer){clearTimeout(DB.timer);DB.timer=0;dbFlush()}return new Promise(function(res){var n=0;(function wait(){if((!DB.busy&&!DB.timer&&!DB.again)||n++>100)res();else setTimeout(wait,50)})()})}
 function dbFlush(){
   if(DB.busy){DB.again=true;return}
   var want=dbDocs(),ops=[];
@@ -1905,7 +1931,7 @@ function fdbWrite(){
 function fdbBoot(){if(!fdbSupported())return;idbGet('fdb').then(function(h){if(!h)return;FDB.handle=h;FDB.name=h.name;FDB.status='perm';renderAll()})}
 
 /* ================= change hook + status ================= */
-function cacheLocal(){ls(function(){localStorage.setItem(KEY,JSON.stringify({rev:state.rev,at:Date.now(),state:state}))})}
+function cacheLocal(){if(DESK)return;ls(function(){localStorage.setItem(KEY,JSON.stringify({rev:state.rev,at:Date.now(),state:state}))})}
 function afterChange(){if(DB.on)dbQueue();if(FDB.handle)fdbQueue()}
 function hm(t){var d=new Date(t);return pad(d.getHours())+':'+pad(d.getMinutes())}
 function storageChip(){
@@ -1921,6 +1947,9 @@ function storageChip(){
 }
 function renderStatus(){var s=$('#store-status');if(s)s.innerHTML=storageChip()}
 function storageCard(){
+  if(DESK){
+    return '<div class="card"><h2>قاعدة البيانات</h2><p class="hint">بيانات كل المشاريع محفوظة في ملف قاعدة بيانات واحد على جهازك، وكل تعديل يُحفظ فيه فوراً. يُعمل نسخة احتياطية تلقائية كل يوم.</p><dl class="facts"><dt>الحالة</dt><dd>'+storageChip()+'</dd><dt>مكان الملف</dt><dd class="num" id="db-path" style="direction:ltr;text-align:right">…</dd></dl><div class="toolbar"><button class="btn" data-act="desk-backup">نسخة احتياطية الآن</button><button class="btn" data-act="desk-folder">فتح مجلد البيانات</button><button class="btn" data-act="xlsx-full">تحميل نسخة Excel كاملة</button></div></div>';
+  }
   if(HOST){
     var st=DB.on?(DB.ro?'متصلة (عرض فقط لهذا الحساب)':'متصلة – كل تعديل يُحفظ فوراً ويظهر على أي جهاز تفتح منه الصفحة'):DB.status==='loading'?'جارٍ الاتصال…':'غير متاحة في هذا العرض – التعديلات تُحفظ في هذا المتصفح';
     return '<div class="card"><h2>قاعدة البيانات</h2><p class="hint">بيانات المشروع محفوظة في قاعدة بيانات الصفحة، في جداول مثل شيت Excel: البنود، المهام، المحابس المركبة، التوريدات، المصاريف، الإيقاف والمدد، وأقسام خطة العمل.</p><dl class="facts"><dt>الحالة</dt><dd>'+esc(st)+'</dd>'+(DB.at?'<dt>آخر حفظ</dt><dd>'+hm(DB.at)+'</dd>':'')+'</dl><div class="toolbar"><button class="btn primary" data-act="xlsx-full">تحميل نسخة Excel كاملة من قاعدة البيانات</button></div></div>';
@@ -2139,7 +2168,7 @@ function exportXlsx(full){
 
 (function boot(){
   var th=ls(function(){return localStorage.getItem(UIKEY+'-theme')});if(th)document.documentElement.setAttribute('data-theme',th);
-  $('#app').innerHTML='<header class="top" id="hdr"></header><div id="banners" style="display:flex;flex-direction:column;gap:8px"></div><nav class="tabs" id="tabs" role="tablist"></nav><main class="panel" id="panel"></main>';
+  $('#app').innerHTML='<header class="top" id="hdr"></header><div id="banners" style="display:flex;flex-direction:column;gap:8px"></div><nav class="tabs" id="tabs" role="tablist"></nav><main class="panel" id="panel"></main><footer class="credit">'+CREDIT+'</footer>';
   if(!state.tasks.some(function(t){return t.bs}))initBaseline();
   sched();renderAll();
   if(HOST){HOST.use('downloads').then(function(d){DL=d;renderAll()});dbInit()}

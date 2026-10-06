@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="author" content="Yasser Mohamed Abdelgaber">
+<meta name="copyright" content="© 2026 Yasser Mohamed Abdelgaber. All rights reserved.">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:">
+<title>متابعة المشاريع</title>
+<link rel="stylesheet" href="fonts.css">
+<link rel="stylesheet" href="home.css">
+</head>
+<body>
+<div id="app">
+  <header class="top">
+    <div class="brand">
+      <div class="mark" aria-hidden="true"><i></i><i></i><i></i></div>
+      <div><span class="eyebrow">برنامج متابعة مشاريع المقاولات</span><h1>متابعة المشاريع</h1></div>
+    </div>
+    <div class="actions">
+      <button class="btn primary" data-act="new">+ مشروع جديد</button>
+      <button class="btn" data-act="import">استيراد مشروع من ملف</button>
+    </div>
+  </header>
+  <section class="bar">
+    <div class="seg" role="group" aria-label="عرض المشاريع">
+      <button data-act="filter" data-v="active" aria-pressed="true">المشاريع الحالية <span id="n-active"></span></button>
+      <button data-act="filter" data-v="archived" aria-pressed="false">المؤرشفة <span id="n-arch"></span></button>
+    </div>
+    <input id="q" class="in" type="search" placeholder="بحث باسم المشروع أو الجهة أو رقم أمر الشراء">
+  </section>
+  <main id="grid" class="grid" aria-live="polite"></main>
+  <footer class="foot">
+    <div class="tools">
+      <button class="btn sm" data-act="backup">نسخة احتياطية الآن</button>
+      <button class="btn sm" data-act="restore">استرجاع نسخة احتياطية</button>
+      <button class="btn sm" data-act="folder">فتح مجلد البيانات</button>
+    </div>
+    <p id="dbinfo" class="muted"></p>
+    <p class="credit">متابعة المشاريع · تصميم وبرمجة: م. ياسر محمد عبدالجابر · © <span id="yr">2026</span> جميع الحقوق محفوظة <span id="ver"></span></p>
+  </footer>
+</div>
+<dialog id="dlg"></dialog>
+<div id="toast" class="toast" role="status" hidden></div>
+<script src="home.js"></script>
+</body>
+</html>

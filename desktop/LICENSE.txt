@@ -1,0 +1,31 @@
+متابعة المشاريع (Project Tracker)
+حقوق الطبع والنشر © 2026 م. ياسر محمد عبدالجابر. جميع الحقوق محفوظة.
+
+هذا البرنامج من تصميم وبرمجة م. ياسر محمد عبدالجابر، وهو ملكية خاصة له.
+لا يجوز نسخ البرنامج أو أي جزء منه، أو توزيعه، أو بيعه، أو تعديله، أو إعادة نشره،
+بأي وسيلة، دون إذن كتابي مسبق من المؤلف.
+
+يُسمح للمستخدم المرخَّص له بتثبيت البرنامج واستخدامه على أجهزته لإدارة مشاريعه.
+البيانات التي يُدخلها المستخدم ملك له، وتُحفظ على جهازه فقط.
+
+يُقدَّم البرنامج "كما هو"، دون أي ضمان صريح أو ضمني.
+
+----------------------------------------------------------------------
+
+Project Tracker
+Copyright © 2026 Yasser Mohamed Abdelgaber. All rights reserved.
+
+This software was designed and developed by Yasser Mohamed Abdelgaber and is
+his proprietary property. No part of it may be copied, distributed, sold,
+modified or republished, by any means, without the author's prior written
+permission.
+
+The licensed user may install and use the program on their own devices to
+manage their projects. Data entered by the user belongs to the user and is
+stored on their device only.
+
+The software is provided "as is", without warranty of any kind.
+
+Third-party components keep their own licenses: Electron (MIT),
+sql.js / SQLite (MIT / public domain), ExcelJS (MIT), jsPDF (MIT),
+html2canvas (MIT), IBM Plex Sans Arabic and Readex Pro fonts (SIL OFL 1.1).

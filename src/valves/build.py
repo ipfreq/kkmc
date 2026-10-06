@@ -7,6 +7,10 @@ Writes:
   kkmc-valves-project.html                  online copy (fonts and PDF/Excel libraries load from the internet)
   offline/kkmc-valves-project-offline.html  fully offline copy (fonts and PDF/Excel libraries embedded)
 
+  python3 src/valves/build.py --desktop desktop/renderer
+also writes the desktop program's project page (desktop/renderer/valves.html,
+fully offline) plus fonts.css used by its projects home page.
+
   python3 src/valves/build.py --page OUT.html ADAPTER.html
 also writes a page-content-only copy for publishing as a hosted page; the
 adapter snippet (kept outside the repo) defines window.PLAN_HOST.
@@ -60,10 +64,12 @@ def body(title, fonts_html, libs_html, extra=''):
     ])
 
 
-def page(fonts_html, libs_html):
+def page(fonts_html, libs_html, head_extra='', extra=''):
     return ('<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8">'
             '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">'
-            '</head><body>' + body(TITLE, fonts_html, libs_html) + '</body></html>\n')
+            '<meta name="author" content="Yasser Mohamed Abdelgaber">'
+            '<meta name="copyright" content="© 2026 Yasser Mohamed Abdelgaber. All rights reserved.">'
+            + head_extra + '</head><body>' + body(TITLE, fonts_html, libs_html, extra) + '</body></html>\n')
 
 
 def main():
@@ -75,6 +81,15 @@ def main():
     offline.write_text(page(parts['fonts'], parts['lib-h2c'] + parts['lib-jspdf'] + xlsx), encoding='utf-8')
     for f in (online, offline):
         print('%s  %.0f KB' % (f.relative_to(ROOT), f.stat().st_size / 1024))
+    if '--desktop' in sys.argv:
+        out = pathlib.Path(sys.argv[sys.argv.index('--desktop') + 1])
+        out.mkdir(parents=True, exist_ok=True)
+        csp = ('<meta http-equiv="Content-Security-Policy" content="default-src \'self\' data: blob:; '
+               'script-src \'self\' \'unsafe-inline\' \'unsafe-eval\'; style-src \'self\' \'unsafe-inline\'; img-src \'self\' data: blob:; font-src \'self\' data:">')
+        (out / 'valves.html').write_text(page(parts['fonts'], parts['lib-h2c'] + parts['lib-jspdf'] + xlsx, csp,
+                                              '<script src="desktop-host.js"></script>'), encoding='utf-8')
+        (out / 'fonts.css').write_text(re.sub(r'^<style id="fonts">|</style>$', '', parts['fonts']), encoding='utf-8')
+        print('%s  %.0f KB' % (out / 'valves.html', (out / 'valves.html').stat().st_size / 1024))
     if '--page' in sys.argv:
         i = sys.argv.index('--page')
         out, adapter = pathlib.Path(sys.argv[i + 1]), pathlib.Path(sys.argv[i + 2]).read_text(encoding='utf-8')
