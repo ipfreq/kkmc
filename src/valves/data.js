@@ -99,11 +99,11 @@ function DEFAULT_PROJECT(){
       weekend:[5],logo:'',updated:'',kind:'valves',terms:{}
     },
     boq:boq,groups:groups,tasks:tasks,
-    events:[],installs:[],supplies:[],expenses:[],
+    events:[],installs:[],supplies:[],expenses:[],workers:[],attend:[],
     expCats:['محابس وقطع غيار','مسامير وجوانات وفلنجات','مواد مدنية وأسفلت','عمالة ويوميات','معدات وإيجارات','نقل ومحروقات','إعاشة وسكن','رسوم وتصاريح','أخرى'],
     sections:sections,team:team,equip:equip,rates:rates,risks:risks,conditions:conditions,
     report:{title:'تقرير موقف الأعمال',no:'',from:'',to:'',prices:true,footer:true,breaks:false,notes:'',
       sign:[{t:'إعداد',n:''},{t:'مدير المشروع',n:''},{t:'المهندس المشرف',n:''}],
-      secs:{cover:true,summary:true,boq:true,monthly:true,schedule:true,gantt:true,events:true,installs:true,supplies:true,expenses:true,plan:false,team:false,equip:false,rates:false,risks:false,conditions:false,notes:true,sign:true}}
+      secs:{cover:true,summary:true,boq:true,monthly:true,schedule:true,gantt:true,events:true,installs:true,supplies:true,expenses:true,labor:true,plan:false,team:false,equip:false,rates:false,risks:false,conditions:false,notes:true,sign:true}}
   };
 }

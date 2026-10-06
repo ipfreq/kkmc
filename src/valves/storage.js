@@ -12,7 +12,7 @@ var DL=null;
 function canPrint(){return !HOST||!!HOST.print}
 
 /* ================= shared database (published page) ================= */
-var DBCOLS=['boq','groups','tasks','events','installs','supplies','expenses','sections','team','equip','rates','risks','conditions'];
+var DBCOLS=['boq','groups','tasks','events','installs','supplies','expenses','sections','team','equip','rates','risks','conditions','workers','attend'];
 var DB={api:null,on:false,last:{},timer:0,busy:false,again:false,ro:false,status:HOST?'loading':'off',at:0,err:''};
 function canon(o){if(Array.isArray(o))return '['+o.map(canon).join(',')+']';if(o&&typeof o==='object'){return '{'+Object.keys(o).filter(function(k){return o[k]!==undefined}).sort().map(function(k){return JSON.stringify(k)+':'+canon(o[k])}).join(',')+'}'}return JSON.stringify(o===undefined?null:o)}
 var IDOK=/^[A-Za-z0-9_\-.~:@+]{1,120}$/;
@@ -70,7 +70,7 @@ function dbInit(){
       }else if(HOST.blank){
         var d0=todayNum();
         state.meta=Object.assign(state.meta,{client:'',po:'',location:'',engineer:'',value:'',start:iso(d0),end:iso(d0+179),kind:'works',terms:{}});
-        ['boq','installs','supplies','expenses','events','sections','team','equip','rates','risks','conditions'].forEach(function(k){state[k]=[]});
+        ['boq','installs','supplies','expenses','events','sections','team','equip','rates','risks','conditions','workers','attend'].forEach(function(k){state[k]=[]});
         state.groups=[{id:'g1',name:'المواعيد التعاقدية',color:0},{id:'g2',name:'الأعمال التحضيرية والاعتمادات',color:1},{id:'g3',name:'التوريد',color:2},{id:'g4',name:'التنفيذ والتركيب',color:4}];
         state.expCats=['مواد ومستلزمات','مسامير وجوانات وفلنجات','مواد مدنية وأسفلت','عمالة ويوميات','معدات وإيجارات','نقل ومحروقات','إعاشة وسكن','رسوم وتصاريح','أخرى'];
         state.tasks=state.tasks.filter(function(t){return t.ms}).map(function(t){t.preds=[];t.nb=t.code==='A1000'?iso(d0):iso(d0+179);t.bs='';t.bf='';return t});
@@ -373,6 +373,22 @@ function buildWorkbook(full){
     cats.forEach(function(k,i){var rr=5+i;xRow(ws,rr,cc,[k,F("SUMIF('"+SH.exp+"'!C:C,A"+rr+",'"+SH.exp+"'!J:J)"),F('IF($B$'+tr2+'>0,B'+rr+'/$B$'+tr2+',0)'),F("COUNTIF('"+SH.exp+"'!C:C,A"+rr+")")],i)});
     xTot(ws,tr2,cc,n2?['الإجمالي',F('SUM(B5:B'+(tr2-1)+')'),'',F('SUM(D5:D'+(tr2-1)+')')]:['الإجمالي',0,'',0]);
   }
+  /* labor */
+  if(on('labor')&&state.workers.length){
+    var la=full||!R.from?-Infinity:g.a,lw=state.workers.filter(function(w){return full||w.status!=='left'||labStats(w.id,la,asOf).days});
+    var lc=[{h:'#',w:5},{h:'العامل',w:24,wrap:1},{h:'الوظيفة',w:16,wrap:1},{h:'الحالة',w:11},{h:'حضور',w:7},{h:'غياب',w:7},{h:'إجازة / مرضي',w:9},{h:'مأمورية',w:8},{h:'مرات التأخير',w:9},{h:'الساعات',w:9,fmt:Q},{h:'إضافي',w:8,fmt:Q},{h:'معدل الحضور',w:10,fmt:P},{h:'الانضباط',w:10,fmt:P},{h:'الإنتاجية',w:10,fmt:Q},{h:'تقييم المشرف (من 5)',w:11,fmt:Q},{h:'الدرجة',w:9,fmt:P},{h:'التقدير',w:11}].concat(prices?[{h:'التكلفة ('+c$+')',w:13,fmt:M}]:[]);
+    ws=xSheet(W,'العمالة','العمالة ومؤشرات الأداء',lc,{land:1,sub:sub});
+    lw.forEach(function(w,i){var s=labStats(w.id,la,asOf),ev=w.ev||{},rs=EVK.map(function(k){return num(ev[k[0]])}).filter(function(x){return x>0});
+      xRow(ws,5+i,lc,[i+1,w.name||'',w.job||'',WST[w.status]||'',s.p,s.a,s.l+s.k,s.m,s.late,s.hours,s.ot,s.att,s.punct,s.qty||null,rs.length?rs.reduce(function(a,b){return a+b},0)/rs.length:null,s.score,grade(s.score)[0]].concat(prices?[Math.round(s.cost*100)/100]:[]),i)});
+    var ltr=5+lw.length,ltv=['الإجمالي ('+lw.length+')','','',''];[5,6,7,8,9,10,11].forEach(function(k){ltv.push(lw.length?F('SUM('+colL(k)+'5:'+colL(k)+(ltr-1)+')'):0)});ltv.push('','','','','','');if(prices)ltv.push(lw.length?F('SUM('+colL(18)+'5:'+colL(18)+(ltr-1)+')'):0);
+    xTot(ws,ltr,lc,ltv);
+    var ac=[{h:'#',w:5},{h:'التاريخ',w:12,fmt:D},{h:'اليوم',w:10},{h:'العامل',w:24,wrap:1},{h:'الوظيفة',w:16,wrap:1},{h:'الحالة',w:10},{h:'الحضور',w:9},{h:'الانصراف',w:9},{h:'الساعات',w:9,fmt:Q},{h:'إضافي',w:8,fmt:Q},{h:'تأخير (دقيقة)',w:10},{h:'ملاحظات / مكان المأمورية',w:32,wrap:1}];
+    var al=[],sh=shiftCfg();state.attend.slice().sort(function(a,b){return dnum(a.date)-dnum(b.date)}).forEach(function(d){var n=dnum(d.date);if(n<la||n>asOf)return;lw.forEach(function(w){var x=d.rows[w.id];if(x&&ASTL[x.s])al.push([d,w,x])})});
+    ws=xSheet(W,'الحضور والانصراف','سجل الحضور والانصراف',ac,{land:1,sub:sub});
+    al.forEach(function(z,i){var h=attHours(z[2]);xRow(ws,5+i,ac,[i+1,xDs(z[0].date),DOWS[dow(dnum(z[0].date))],z[1].name||'',z[1].job||'',ASTL[z[2].s],z[2].inn||'',z[2].out||'',h||null,Math.max(0,h-sh.day)||null,attLate(z[2])||null,z[2].note||''],i)});
+    var atr=5+al.length;xTot(ws,atr,ac,['الإجمالي ('+al.length+')','','','','','','','',al.length?F('SUM(I5:I'+(atr-1)+')'):0,al.length?F('SUM(J5:J'+(atr-1)+')'):0,'','']);
+    if(al.length)ws.autoFilter={from:{row:4,column:1},to:{row:atr-1,column:ac.length}};
+  }
   /* work plan */
   if(on('plan')){
     var pc=[{h:'القسم',w:30,wrap:1},{h:'المحتوى',w:100,wrap:1}];
@@ -416,7 +432,7 @@ function exportXlsx(full){
 /* ================= edit timeline: every change is kept as a reversible diff ================= */
 var TL={entries:[],pos:0,pending:null,cap:DESK?3000:400,loaded:false,chain:Promise.resolve()};
 var TLKEY=KEY+'-timeline';
-var TLNAMES={boq:'حصر الأعمال',groups:'مجموعات الجدول',tasks:'الجدول الزمني',events:'الإيقاف والمدد',installs:'سجل التنفيذ',supplies:'التوريدات',expenses:'المصاريف',sections:'خطة العمل',team:'فريق العمل',equip:'المعدات',rates:'معدلات الإنتاج',risks:'المخاطر',conditions:'الشروط'};
+var TLNAMES={workers:'العمال',attend:'الحضور والانصراف',boq:'حصر الأعمال',groups:'مجموعات الجدول',tasks:'الجدول الزمني',events:'الإيقاف والمدد',installs:'سجل التنفيذ',supplies:'التوريدات',expenses:'المصاريف',sections:'خطة العمل',team:'فريق العمل',equip:'المعدات',rates:'معدلات الإنتاج',risks:'المخاطر',conditions:'الشروط'};
 function tlDocs(){var d=dbDocs(),m={};Object.keys(d).forEach(function(p){m[p]={b:d[p],j:canon(d[p])}});return m}
 function tlLabel(ch){
   var g={},out=[];

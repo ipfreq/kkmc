@@ -48,13 +48,14 @@ var hist=[],fut=[];
 function normalize(s){
   var d=DEFAULT_PROJECT();
   s.meta=Object.assign({},d.meta,s.meta||{});
-  ['boq','groups','tasks','events','installs','supplies','expenses','sections','team','equip','rates','risks','conditions'].forEach(function(k){if(!Array.isArray(s[k]))s[k]=d[k]});
+  ['boq','groups','tasks','events','installs','supplies','expenses','sections','team','equip','rates','risks','conditions','workers','attend'].forEach(function(k){if(!Array.isArray(s[k]))s[k]=d[k]});
   if(!Array.isArray(s.expCats)||!s.expCats.length)s.expCats=d.expCats;
   s.report=Object.assign({},d.report,s.report||{});s.report.secs=Object.assign({},d.report.secs,s.report.secs||{});
   if(!Array.isArray(s.report.sign))s.report.sign=d.report.sign;
   if(!Array.isArray(s.meta.weekend))s.meta.weekend=[5];
   s.tasks.forEach(function(t){if(!Array.isArray(t.preds))t.preds=[];t.ms=!!t.ms;});
-  ['boq','groups','tasks','events','installs','supplies','expenses','sections','team','equip','rates','risks','conditions'].forEach(function(k){s[k].forEach(function(r){if(!r||!/^[A-Za-z0-9_\-.~:@+]{1,120}$/.test(r.id||''))r.id=uid(k.charAt(0))})});
+  s.attend.forEach(function(d){if(!d.rows||typeof d.rows!=='object')d.rows={}});
+  ['boq','groups','tasks','events','installs','supplies','expenses','sections','team','equip','rates','risks','conditions','workers','attend'].forEach(function(k){s[k].forEach(function(r){if(!r||!/^[A-Za-z0-9_\-.~:@+]{1,120}$/.test(r.id||''))r.id=uid(k.charAt(0))})});
   s.rev=s.rev||1;
   return s;
 }
@@ -226,17 +227,18 @@ function kpiHtml(){
   '<div class="kpi"><span class="k">المدة الزمنية</span><span class="v">'+(td<cs?'لم يبدأ':el_+'<small>من '+dur+' يوم</small>')+'</span><div class="bar"><i class="pl" style="width:'+pct(el_/dur)+'%"></i></div><span class="s">'+(rem>=0?'المتبقي '+rem+' يوماً حتى '+fs(re):'تجاوز النهاية المعدّلة بـ '+(-rem)+' يوماً')+'</span></div>'+
   '<div class="kpi"><span class="k">الإيقاف وإضافة المدد</span><span class="v">+'+addDays()+'<small>يوم</small></span><span class="s">إيقاف '+stopDays()+' · تمديد '+extDays()+' يوم</span></div>'+
   (v.tot?'<div class="kpi"><span class="k">قيمة الأعمال المنفذة</span><span class="v">'+money(v.ex)+'<small>'+c+'</small></span><span class="s">من '+money(v.tot)+' '+c+' قبل الضريبة'+(v.hasRates?'':' (القيمة الإجمالية فقط)')+'</span></div>':'')+
+  (state.workers.length?(function(){var t=laborToday();return '<div class="kpi"><span class="k">العمالة اليوم</span><span class="v">'+t.p+'<small>حاضر من '+t.all+'</small></span><div class="bar"><i class="ac" style="width:'+pct(t.all?t.p/t.all:0)+'%"></i></div><span class="s">مأمورية '+t.m+' · غياب '+t.a+'</span></div>'})():'')+
   '<div class="kpi"><span class="k">المصاريف</span><span class="v">'+money(ex)+'<small>'+c+'</small></span><span class="s">'+state.expenses.length+' بند مصروف</span></div>'+
   '</div>';
 }
-var TABS=[['dash','لوحة المتابعة'],['boq','حصر الأعمال'],['gantt','الجدول الزمني'],['installs','المحابس المركبة'],['supplies','التوريدات'],['expenses','المصاريف'],['events','الإيقاف والمدد'],['plan','خطة العمل'],['report','التقرير / PDF'],['settings','بيانات المشروع']];
+var TABS=[['dash','لوحة المتابعة'],['boq','حصر الأعمال'],['gantt','الجدول الزمني'],['installs','المحابس المركبة'],['supplies','التوريدات'],['expenses','المصاريف'],['labor','العمالة'],['events','الإيقاف والمدد'],['plan','خطة العمل'],['report','التقرير / PDF'],['settings','بيانات المشروع']];
 function tabDefault(k){if(k==='installs')return TERMS[state.meta.kind==='works'?'works':'valves'].log;for(var i=0;i<TABS.length;i++)if(TABS[i][0]===k)return TABS[i][1];return k}
 function tabLabel(k){if(k==='installs')return TM('log');var n=String((state.meta.tabNames||{})[k]||'').trim();return n||tabDefault(k)}
 function renameTab(k,name){name=String(name||'').replace(/\s+/g,' ').trim();mutate(function(){if(k==='installs'){state.meta.terms=Object.assign({},state.meta.terms);state.meta.terms.log=name}else{state.meta.tabNames=Object.assign({},state.meta.tabNames);if(name)state.meta.tabNames[k]=name;else delete state.meta.tabNames[k]}})}
 function tabHidden(k){return k!=='dash'&&k!=='settings'&&(state.meta.hiddenTabs||[]).indexOf(k)>=0}
 function renderTabs(){
   if(tabHidden(ui.tab))ui.tab='dash';
-  var cnt={installs:state.installs.length,supplies:state.supplies.length,expenses:state.expenses.length,events:state.events.length};
+  var cnt={labor:state.workers.filter(function(w){return w.status!=='left'}).length,installs:state.installs.length,supplies:state.supplies.length,expenses:state.expenses.length,events:state.events.length};
   $('#tabs').innerHTML=TABS.filter(function(t){return !tabHidden(t[0])}).map(function(t){return '<button role="tab" aria-selected="'+(ui.tab===t[0])+'" data-act="tab" data-v="'+t[0]+'" title="دبل كليك لتغيير الاسم">'+esc(tabLabel(t[0]))+(cnt[t[0]]?'<span class="cnt">'+cnt[t[0]]+'</span>':'')+'</button>'}).join('');
 }
 
@@ -398,7 +400,7 @@ function renderInstalls(p){
   p.innerHTML=(state.boq.length?'<div class="card"><div class="card-h"><h2>نسبة تنفيذ البنود</h2><span class="pill a">الإجمالي '+pct(overall().act)+'%</span></div><p class="hint">حرّك السلايدر لتحديد نسبة تنفيذ أي بند حتى 100%، أو سجّل الكميات المنفذة في السجل بالأسفل لتُحسب النسبة تلقائياً. زر ↺ يرجع البند للحساب من السجل.</p><div class="tw"><table class="t"><thead><tr><th>البند</th><th class="n">الكمية</th><th>نسبة التنفيذ</th><th class="n">الكمية المنفذة</th><th class="c">المصدر</th></tr></thead><tbody>'+prows+'</tbody></table></div></div>':'')+'<div class="card"><div class="card-h"><h2>سجل '+TM('log')+'</h2><span class="pill a">'+qn(installedAll())+' '+TM('unit')+' '+TM('doneU')+' من '+qn(totQty())+'</span></div>'+addForm('installs')+filterBar('installs',true)+
   (list.length?'<div class="tw"><table class="t"><thead><tr><th>التاريخ</th><th>'+TM('itemCol')+'</th><th class="n">العدد</th><th>الموقع</th><th>الرقم التسلسلي</th><th>اختبار الضغط</th><th class="n">انقطاع (س)</th><th>الفريق</th><th>ملاحظات</th><th></th></tr></thead><tbody>'+rows+'</tbody><tfoot><tr><td colspan="2">الإجمالي ('+list.length+' سجل)</td><td class="n">'+qn(tot)+'</td><td colspan="7"></td></tr></tfoot></table></div>':'<div class="empty">لا توجد سجلات '+TM('verb')+''+(state.installs.length?' مطابقة للفلتر':'')+'. أضف أول سجل من النموذج أعلاه.</div>')+
   '<p class="hint">👁 / 🚫 لإخفاء سجل من التقرير المطبوع فقط (يبقى محسوباً في نسب الإنجاز).</p></div>'+
-  dl('loc-list',state.installs.map(function(r){return r.loc}))+dl('team-list',state.installs.map(function(r){return r.team}));
+  dl('loc-list',state.installs.map(function(r){return r.loc}))+dl('team-list',state.workers.filter(function(w){return w.status!=='left'}).map(function(w){return w.name}).concat(state.installs.map(function(r){return r.team})));
 }
 function renderSupplies(p){
   var list=filt('supplies',state.supplies),tot=list.reduce(function(s,r){return s+num(r.qty)},0);
@@ -602,7 +604,7 @@ document.addEventListener('change',function(e){
 function shrink(src,w,cb){var im=new Image();im.onload=function(){var s=Math.min(1,w/im.width),c=document.createElement('canvas');c.width=Math.round(im.width*s);c.height=Math.round(im.height*s);var x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(im,0,0,c.width,c.height);cb(c.toDataURL('image/jpeg',.85))};im.onerror=function(){cb(src)};im.src=src}
 
 /* ================= report pages ================= */
-var RSECS=[['cover','بيانات المشروع والتقرير'],['summary','ملخص الموقف'],['boq','حصر الأعمال (الكميات)'],['monthly','ملخص التنفيذ الشهري'],['schedule','الجدول الزمني (جدول)'],['gantt','المخطط الزمني (Gantt)'],['events','أوامر الإيقاف وإضافة المدد'],['installs','سجل الأعمال المنفذة'],['supplies','سجل التوريدات'],['expenses','المصاريف'],['plan','خطة العمل (الأقسام المختارة)'],['rates','معدلات الإنتاج'],['team','فريق العمل'],['equip','المعدات'],['risks','سجل المخاطر'],['conditions','شروط مجال العمل'],['notes','ملاحظات'],['sign','التوقيعات']];
+var RSECS=[['cover','بيانات المشروع والتقرير'],['summary','ملخص الموقف'],['boq','حصر الأعمال (الكميات)'],['monthly','ملخص التنفيذ الشهري'],['schedule','الجدول الزمني (جدول)'],['gantt','المخطط الزمني (Gantt)'],['events','أوامر الإيقاف وإضافة المدد'],['installs','سجل الأعمال المنفذة'],['supplies','سجل التوريدات'],['expenses','المصاريف'],['labor','العمالة والحضور وتقييم الأداء'],['plan','خطة العمل (الأقسام المختارة)'],['rates','معدلات الإنتاج'],['team','فريق العمل'],['equip','المعدات'],['risks','سجل المخاطر'],['conditions','شروط مجال العمل'],['notes','ملاحظات'],['sign','التوقيعات']];
 function repRange(){var R=state.report,a=R.from?dnum(R.from):-Infinity,b=R.to?dnum(R.to):todayNum();if(isNaN(a))a=-Infinity;if(isNaN(b))b=todayNum();return {a:a,b:b}}
 function inR(r,g){var d=dnum(r.date);return !isNaN(d)&&d>=g.a&&d<=g.b}
 function buildPages(host){
@@ -702,6 +704,12 @@ function buildPages(host){
     table('المصاريف حسب التصنيف'+(R.from?' خلال الفترة':''),['التصنيف','المبلغ ('+c+')','النسبة'],ck.map(function(k){return '<td class="tx">'+esc(k)+'</td><td>'+money(bc[k])+'</td><td><div class="rb"><i style="width:'+pct(et?bc[k]/et:0)+'%"></i></div>'+pct(et?bc[k]/et:0)+'%</td>'}),ck.length?'<td>الإجمالي</td><td>'+money(et)+'</td><td></td>':null);
     var en=el2.reduce(function(s,r){return s+expNet(r)},0),ev=el2.reduce(function(s,r){return s+expVat(r)},0);
     table('تفاصيل المصاريف',['#','التاريخ','التصنيف','البيان','الكمية','سعر الوحدة','قبل الضريبة','الضريبة','الإجمالي','المورد','الفاتورة'],el2.map(function(r,i){return '<td>'+(i+1)+'</td><td>'+fsi(r.date)+'</td><td>'+esc(r.cat||'')+'</td><td class="tx">'+esc(r.desc||'')+'</td><td>'+(num(r.qty)?qn(num(r.qty)):'')+'</td><td>'+(num(r.price)?money(num(r.price)):'')+'</td><td>'+money(expNet(r))+'</td><td>'+(expVat(r)?money(expVat(r)):'–')+'</td><td><b>'+money(expTot(r))+'</b></td><td class="tx">'+esc(r.vendor||'')+'</td><td>'+esc(r.ref||'')+'</td>'}),el2.length?'<td colspan="6">الإجمالي</td><td>'+money(en)+'</td><td>'+money(ev)+'</td><td>'+money(et)+'</td><td colspan="2"></td>':null);
+  }
+  if(S.labor&&state.workers.length){
+    var la=R.from?g.a:-Infinity,lw=state.workers.filter(function(w){var s=labStats(w.id,la,g.b);return w.status!=='left'||s.days}),lt={p:0,a:0,o:0,m:0,h:0,x:0,c:0},lp=R.prices;
+    var lrows=lw.map(function(w,i){var s=labStats(w.id,la,g.b),gd=grade(s.score);lt.p+=s.p;lt.a+=s.a;lt.o+=s.l+s.k;lt.m+=s.m;lt.h+=s.hours;lt.x+=s.ot;lt.c+=s.cost;
+      return '<td>'+(i+1)+'</td><td class="tx">'+esc(w.name||'')+(w.status==='mission'?' (مأمورية)':w.status==='left'?' (ترك العمل)':'')+'</td><td class="tx">'+esc(w.job||'')+'</td><td>'+s.p+'</td><td>'+s.a+'</td><td>'+(s.l+s.k)+'</td><td>'+s.m+'</td><td>'+s.late+'</td><td>'+qn(s.hours)+'</td><td>'+qn(s.ot)+'</td><td>'+(s.att==null?'—':pct(s.att)+'%')+'</td>'+(lp?'<td>'+money(s.cost)+'</td>':'')+'<td>'+(s.score==null?'—':pct(s.score)+'%')+'</td><td class="'+(gd[1]==='ok'?'ok':gd[1]==='bad'?'bad':'')+'">'+gd[0]+'</td>'});
+    table('العمالة والحضور وتقييم الأداء'+(R.from?' خلال الفترة':''),['#','العامل','الوظيفة','حضور','غياب','إجازة/مرضي','مأمورية','تأخير','الساعات','إضافي','معدل الحضور'].concat(lp?['التكلفة ('+c+')']:[]).concat(['الدرجة','التقدير']),lrows,lrows.length?'<td colspan="3">الإجمالي ('+lw.length+' عامل)</td><td>'+lt.p+'</td><td>'+lt.a+'</td><td>'+lt.o+'</td><td>'+lt.m+'</td><td></td><td>'+qn(lt.h)+'</td><td>'+qn(lt.x)+'</td><td></td>'+(lp?'<td>'+money(lt.c)+'</td>':'')+'<td colspan="2"></td>':null);
   }
   if(S.plan)state.sections.filter(function(s){return s.rep}).forEach(function(s){paras(s.title,s.body)});
   if(S.rates){var rt=0;table('معدلات الإنتاج وتوزيع الفرق',[TM('itemCol'),'المجموعات','أفراد/مجموعة','المستهدف اليومي/مجموعة','الإجمالي اليومي','الكمية','المدة (يوم)'],state.rates.map(function(r){var b=boqById(r.boq);rt+=rateDur(r);return '<td>'+esc(boqName(r.boq))+'</td><td>'+qn(num(r.crews))+'</td><td>'+qn(num(r.per))+'</td><td>'+qn(num(r.daily))+'</td><td>'+qn(num(r.crews)*num(r.daily))+'</td><td>'+(b?qn(num(b.qty)):'')+'</td><td>'+rateDur(r)+'</td>'}),'<td colspan="6">إجمالي أيام العمل الفعلية</td><td>'+rt+'</td>')}
@@ -865,7 +873,7 @@ document.addEventListener('keydown',function(e){if((e.ctrlKey||e.metaKey)&&!e.al
 window.addEventListener('beforeunload',function(){cacheLocal();if(DB.timer){clearTimeout(DB.timer);DB.timer=0;dbFlush()}});
 
 /* ================= render ================= */
-var PANELS={dash:renderDash,boq:renderBoq,gantt:renderGantt,installs:renderInstalls,supplies:renderSupplies,expenses:renderExpenses,events:renderEvents,plan:renderPlan,report:renderReport,settings:renderSettings};
+var PANELS={dash:renderDash,boq:renderBoq,gantt:renderGantt,installs:renderInstalls,supplies:renderSupplies,expenses:renderExpenses,labor:renderLabor,events:renderEvents,plan:renderPlan,report:renderReport,settings:renderSettings};
 function renderAll(){
   var ae=document.activeElement,key=ae&&(ae.getAttribute('data-b')||ae.getAttribute('data-f')),ss=ae&&ae.selectionStart,se=ae&&ae.selectionEnd;
   var y=window.scrollY;
