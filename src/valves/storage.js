@@ -298,7 +298,7 @@ function buildWorkbook(full){
     boqs.forEach(function(b,i){var rr=r0+i,q=num(b.qty),s=suppliedOf(b.id,asOf),ins=installedOf(b.id,asOf),rt=num(b.rate);
       var sF=full?F("SUMIFS('"+SH.sup+"'!E:E,'"+SH.sup+"'!C:C,A"+rr+")",s):s,iF=full&&!manualPct(b)?F("SUMIFS('"+SH.inst+"'!E:E,'"+SH.inst+"'!C:C,A"+rr+")",ins):ins;
       xRow(ws,rr,bc,[noVal(b),b.dia===''?null:num(b.dia),b.desc,b.unit,q,sF,iF,F('MAX(0,E'+rr+'-G'+rr+')',Math.max(0,q-ins)),F('IF(E'+rr+'>0,G'+rr+'/E'+rr+',0)',q?ins/q:0)].concat(prices?[rt||null,F('E'+rr+'*J'+rr,q*rt),F('MIN(G'+rr+',E'+rr+')*J'+rr,Math.min(ins,q)*rt)]:[]),i)});
-    var rl=r0+boqs.length-1,rt_=rl+1,sum=function(L){return F('SUM('+L+r0+':'+L+rl+')')};
+    var rl=r0+boqs.length-1,rt_=rl+1,sum=function(L){return boqs.length?F('SUM('+L+r0+':'+L+rl+')'):0};
     xTot(ws,rt_,bc,['الإجمالي','','','',sum('E'),sum('F'),sum('G'),sum('H'),F('IF(E'+rt_+'>0,G'+rt_+'/E'+rt_+',0)')].concat(prices?['',sum('K'),sum('L')]:[]));
     ws.mergeCells(rt_,1,rt_,4);
     if(prices){var vr=rt_+2;[['ضريبة القيمة المضافة '+num(m.vat)+'%',F('K'+rt_+'*'+(num(m.vat)/100))],['الإجمالي شامل الضريبة',F('K'+rt_+'+K'+(vr))]].forEach(function(x,k){var row=vr+k;ws.mergeCells(row,8,row,10);var a=ws.getCell(row,8);a.value=x[0];a.font={name:XFONT,size:10,bold:true};a.alignment={horizontal:'right',readingOrder:'rtl'};a.border=BORDER;a.fill=fill(XC.tot);var b=ws.getCell(row,11);b.value=x[1];b.numFmt=M;b.font={name:XFONT,size:10,bold:true};b.border=BORDER;b.fill=fill(XC.tot)})}
@@ -357,7 +357,7 @@ function buildWorkbook(full){
     list=list.filter(function(x){return vis(x)&&inP(x)}).sort(function(a,b){return (dnum(a.date)||0)-(dnum(b.date)||0)});
     ws=xSheet(W,sheet,title,cols,{land:1,sub:sub});
     list.forEach(function(x,i){var rw=xRow(ws,5+i,cols,map(x,i),i);if(key==='inst'){var tcl=rw.getCell(8);if(x.test==='ناجح')tcl.font={name:XFONT,size:10,bold:true,color:{argb:XC.ok}};else if(x.test==='غير ناجح')tcl.font={name:XFONT,size:10,bold:true,color:{argb:XC.bad}}}});
-    var tr=5+list.length,sc=[].concat(qtyCol),tv=['الإجمالي ('+list.length+')'];for(var k=1;k<cols.length;k++){var L=colL(k+1);tv.push(sc.indexOf(k+1)>=0?F('SUBTOTAL(109,'+L+'5:'+L+Math.max(5,tr-1)+')'):'')}
+    var tr=5+list.length,sc=[].concat(qtyCol),tv=['الإجمالي ('+list.length+')'];for(var k=1;k<cols.length;k++){var L=colL(k+1);tv.push(sc.indexOf(k+1)>=0?(list.length?F('SUBTOTAL(109,'+L+'5:'+L+(tr-1)+')'):0):'')}
     xTot(ws,tr,cols,tv);
     if(list.length)ws.autoFilter={from:{row:4,column:1},to:{row:tr-1,column:cols.length}};
   }
@@ -371,7 +371,7 @@ function buildWorkbook(full){
     ws=xSheet(W,'ملخص المصاريف','المصاريف حسب التصنيف',cc,{sub:sub});
     var n2=cats.length,tr2=5+n2;
     cats.forEach(function(k,i){var rr=5+i;xRow(ws,rr,cc,[k,F("SUMIF('"+SH.exp+"'!C:C,A"+rr+",'"+SH.exp+"'!J:J)"),F('IF($B$'+tr2+'>0,B'+rr+'/$B$'+tr2+',0)'),F("COUNTIF('"+SH.exp+"'!C:C,A"+rr+")")],i)});
-    xTot(ws,tr2,cc,['الإجمالي',F('SUM(B5:B'+Math.max(5,tr2-1)+')'),'',F('SUM(D5:D'+Math.max(5,tr2-1)+')')]);
+    xTot(ws,tr2,cc,n2?['الإجمالي',F('SUM(B5:B'+(tr2-1)+')'),'',F('SUM(D5:D'+(tr2-1)+')')]:['الإجمالي',0,'',0]);
   }
   /* work plan */
   if(on('plan')){
@@ -382,7 +382,7 @@ function buildWorkbook(full){
   if(on('team')||on('equip')||on('rates')){
     ws=xSheet(W,'الموارد','الموارد: فريق العمل والمعدات ومعدلات الإنتاج',[{w:30},{w:13},{w:13},{w:15},{w:13},{w:11},{w:11}],{noFreeze:true,noHead:true});
     r=4;
-    var sub2=function(title,cols,rows,tot){band(ws,r++,cols.length,title);xHead(ws,r++,cols);var a=r;(typeof rows==='function'?rows(a):rows).forEach(function(x,i){xRow(ws,r++,cols,x,i)});if(tot)xTot(ws,r++,cols,tot(a,r-1));r++};
+    var sub2=function(title,cols,rows,tot){band(ws,r++,cols.length,title);xHead(ws,r++,cols);var a=r;(typeof rows==='function'?rows(a):rows).forEach(function(x,i){xRow(ws,r++,cols,x,i)});if(tot){var e=r-1;xTot(ws,r,cols,e>=a?tot(a,e):tot(a,e).map(function(v){return v&&v.formula?0:v}));r++}r++};
     if(on('team'))sub2('فريق العمل',[{h:'الوظيفة',w:30,wrap:1},{h:'سنوات الخبرة'},{h:'العدد'}],state.team.map(function(x){return [x.role||'',num(x.exp)||null,num(x.count)]}),function(a,b){return ['الإجمالي','',F('SUM(C'+a+':C'+b+')')]});
     if(on('equip'))sub2('المعدات والأدوات',[{h:'المعدة',w:30,wrap:1},{h:'العدد'},{h:'ملاحظات',w:13,wrap:1}],state.equip.map(function(x){return [x.name||'',num(x.count),x.notes||'']}),function(a,b){return ['الإجمالي',F('SUM(B'+a+':B'+b+')'),'']});
     if(on('rates'))sub2('معدلات الإنتاج وتوزيع الفرق',[{h:TM('itemCol'),w:30},{h:'عدد المجموعات'},{h:'أفراد / مجموعة'},{h:'المستهدف اليومي / مجموعة'},{h:'الإجمالي اليومي'},{h:'الكمية'},{h:'المدة (يوم)'}],function(a){return state.rates.map(function(x,i){var b=boqById(x.boq),q=b?num(b.qty):0,rr=a+i;return [boqName(x.boq),num(x.crews),num(x.per),num(x.daily),F('B'+rr+'*D'+rr,num(x.crews)*num(x.daily)),q,F('IF(E'+rr+'>0,ROUNDUP(F'+rr+'/E'+rr+',0),0)',rateDur(x))]})},function(a,b){return ['إجمالي أيام العمل','','','','','',F('SUM(G'+a+':G'+b+')')]});
