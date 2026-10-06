@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS records(
   PRIMARY KEY(project, coll, id));
 CREATE TABLE IF NOT EXISTS kv(key TEXT PRIMARY KEY, value TEXT);
 `;
-const COLLS = ['boq', 'groups', 'tasks', 'events', 'installs', 'supplies', 'expenses', 'sections', 'team', 'equip', 'rates', 'risks', 'conditions'];
+const COLLS = ['doc', 'boq', 'groups', 'tasks', 'events', 'installs', 'supplies', 'expenses', 'sections', 'team', 'equip', 'rates', 'risks', 'conditions'];
 const DAY = 864e5;
 
 class Store {
@@ -146,7 +146,35 @@ class Store {
   }
 
   projects() {
-    return this.all('SELECT * FROM projects ORDER BY archived, updated DESC').map(p => Object.assign(p, { summary: this.summary(p.id) }));
+    return this.all('SELECT * FROM projects ORDER BY archived, updated DESC')
+      .map(p => Object.assign(p, { summary: p.type === 'plan' ? this.planSummary(p.id) : this.summary(p.id) }));
+  }
+
+  kv(key, value) {
+    if (value === undefined) { const r = this.all('SELECT value FROM kv WHERE key=?', [key])[0]; return r ? r.value : null; }
+    this.db.run('INSERT INTO kv(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', [key, String(value)]);
+    this.touch();
+  }
+
+  /* ---- work-plan projects (lift stations): the whole plan is one document ---- */
+  planGet(id) {
+    const r = this.all("SELECT data FROM records WHERE project=? AND coll='doc' AND id='state'", [id])[0];
+    return r ? JSON.parse(r.data) : null;
+  }
+
+  planSave(id, root) { this.set(id, 'doc/state', root); }
+
+  planSummary(id) {
+    const root = this.planGet(id);
+    if (!root || !Array.isArray(root.projects)) return { empty: true, plan: true };
+    let w = 0, done = 0, tasks = 0;
+    root.projects.forEach(p => (p.tasks || []).forEach(t => {
+      if (t.ms) return;
+      const d = Math.max(1, num(t.dur)); w += d; done += d * Math.min(100, num(t.progress)) / 100; tasks++;
+    }));
+    const m = (root.projects[0] && root.projects[0].meta) || {};
+    return { plan: true, name: m.project || '', client: m.company || '', progress: w ? done / w : 0, tasks,
+      plans: root.projects.map(p => (p.meta && p.meta.project) || 'خطة') };
   }
 
   summary(id) {

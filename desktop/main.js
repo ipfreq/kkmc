@@ -34,6 +34,38 @@ function createWindow() {
   win.loadFile(path.join(__dirname, 'renderer', 'home.html'));
 }
 
+/* ---- work-plan projects (lift stations): the plan page is the offline plan app with this project's data ---- */
+const PLAN_APP = path.join(__dirname, 'renderer', 'plan-app.html');
+const PLAN_DATA_TAG = '<script type="application/json" id="plan-data">';
+const PLAN_SHIM = '<script id="desktop-plan">' + fs.readFileSync(path.join(__dirname, 'renderer', 'plan-shim.js'), 'utf8') + '</script>';
+
+function planTemplateData() {
+  const html = fs.readFileSync(PLAN_APP, 'utf8');
+  const i = html.indexOf(PLAN_DATA_TAG), j = html.indexOf('</script>', i);
+  return JSON.parse(html.slice(i + PLAN_DATA_TAG.length, j));
+}
+
+function openPlan(id) {
+  const root = store.planGet(id) || planTemplateData();
+  let html = fs.readFileSync(PLAN_APP, 'utf8');
+  const i = html.indexOf(PLAN_DATA_TAG), j = html.indexOf('</script>', i);
+  html = html.slice(0, i + PLAN_DATA_TAG.length) + JSON.stringify(root).replace(/</g, '\\u003c') + html.slice(j);
+  const k = html.indexOf('<script id="app-js">');
+  html = html.slice(0, k) + PLAN_SHIM + html.slice(k);
+  const file = path.join(app.getPath('userData'), 'plan-view.html');
+  fs.writeFileSync(file, html);
+  return win.loadFile(file, { query: { p: id } });
+}
+
+function seedPlan() {
+  if (store.kv('seeded_plan')) return;
+  if (!store.all("SELECT id FROM projects WHERE type='plan'").length && fs.existsSync(PLAN_APP)) {
+    const id = store.create('خطط محطات الرفع – مدينة الملك خالد العسكرية', 'plan');
+    store.planSave(id, planTemplateData());
+  }
+  store.kv('seeded_plan', '1');
+}
+
 function safeName(name) { return String(name || 'ملف').replace(/[\\/:*?"<>|\r\n]+/g, ' ').trim().slice(0, 150) || 'ملف'; }
 
 function filtersFor(name) {
@@ -57,7 +89,14 @@ function handlers() {
   h('db:del', (e, p, docPath) => { store.del(p, docPath); return true; });
 
   h('projects:list', () => store.projects());
-  h('projects:create', (e, name, type) => store.create(name, type));
+  h('projects:create', (e, name, type) => {
+    const id = store.create(name, type);
+    if (type === 'plan') store.planSave(id, planTemplateData());
+    return id;
+  });
+  h('plan:open', (e, id) => { openPlan(id); return true; });
+  h('plan:save', (e, id, root) => { store.planSave(id, root); return true; });
+  h('app:home', () => { win.loadFile(path.join(__dirname, 'renderer', 'home.html')); return true; });
   h('projects:duplicate', (e, id) => store.duplicate(id));
   h('projects:remove', (e, id) => { store.remove(id); return true; });
   h('projects:archive', (e, id, flag) => { store.archive(id, flag); return true; });
@@ -99,6 +138,7 @@ app.whenReady().then(async () => {
     dialog.showErrorBox(APP_TITLE, 'تعذّر فتح قاعدة البيانات:\n' + store.file + '\n\n' + (err && err.message));
     app.quit(); return;
   }
+  seedPlan();
   handlers();
   createWindow();
 });

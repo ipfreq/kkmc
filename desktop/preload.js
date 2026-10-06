@@ -20,5 +20,8 @@ contextBridge.exposeInMainWorld('DESKTOP', {
   info: () => call('app:info'),
   backupNow: () => call('app:backup'),
   openData: () => call('app:openData'),
-  restore: () => call('app:restore')
+  restore: () => call('app:restore'),
+  openPlan: id => call('plan:open', id),
+  planSave: (id, root) => call('plan:save', id, root),
+  home: () => call('app:home')
 });
