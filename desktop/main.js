@@ -89,6 +89,7 @@ function handlers() {
   h('db:del', (e, p, docPath) => { store.del(p, docPath); return true; });
 
   h('projects:list', () => store.projects());
+  h('purchases:all', () => store.purchases());
   h('projects:create', (e, name, type) => {
     const id = store.create(name, type);
     if (type === 'plan') store.planSave(id, planTemplateData());

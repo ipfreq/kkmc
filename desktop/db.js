@@ -166,6 +166,18 @@ class Store {
     this.touch();
   }
 
+  /* ---- purchases of every project (the expenses sheets), for the price list ---- */
+  purchases() {
+    const projs = {}, meta = {};
+    this.all('SELECT id, name, archived, type FROM projects').forEach(p => { projs[p.id] = p; });
+    this.all("SELECT project, data FROM records WHERE coll='project' AND id='meta'").forEach(r => { meta[r.project] = JSON.parse(r.data); });
+    return this.all("SELECT project, id, data FROM records WHERE coll='expenses'").filter(r => projs[r.project]).map(r => {
+      const m = meta[r.project] || {}, p = projs[r.project];
+      return { project: r.project, id: r.id, pname: m.name || p.name || '', pshort: m.short || '', po: m.po || '', client: m.client || '',
+        currency: m.currency || '', archived: !!p.archived, d: JSON.parse(r.data) };
+    });
+  }
+
   /* ---- projects ---- */
   create(name, type) {
     const id = 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);

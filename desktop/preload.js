@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('DESKTOP', {
   set: (p, docPath, data) => call('db:set', p, docPath, data),
   del: (p, docPath) => call('db:del', p, docPath),
   projects: () => call('projects:list'),
+  purchases: () => call('purchases:all'),
   create: (name, type) => call('projects:create', name, type),
   duplicate: id => call('projects:duplicate', id),
   remove: id => call('projects:remove', id),

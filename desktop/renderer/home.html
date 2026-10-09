@@ -18,6 +18,7 @@
       <div><span class="eyebrow">برنامج متابعة مشاريع المقاولات</span><h1>متابعة المشاريع</h1></div>
     </div>
     <div class="actions">
+      <button class="btn" data-pl="open" aria-pressed="false">قائمة الأسعار والمشتريات</button>
       <button class="btn primary" data-act="new">+ مشروع جديد</button>
       <button class="btn" data-act="import">استيراد مشروع من ملف</button>
     </div>
@@ -30,6 +31,7 @@
     <input id="q" class="in" type="search" placeholder="بحث باسم المشروع أو الجهة أو رقم أمر الشراء">
   </section>
   <main id="grid" class="grid" aria-live="polite"></main>
+  <section id="prices" class="prices" hidden aria-label="قائمة الأسعار والمشتريات"></section>
   <footer class="foot">
     <div class="tools" aria-label="قاعدة البيانات">
       <button class="btn sm" data-tool="export">نسخ قاعدة البيانات</button>
@@ -44,9 +46,13 @@
   </footer>
 </div>
 <dialog id="dlg"></dialog>
+<dialog id="pl-dlg" class="wide"></dialog>
+<dialog id="inv-dlg" class="full"></dialog>
+<div id="print-inv"></div>
 <div id="toast" class="toast" role="status" hidden></div>
 <script src="data.js"></script>
 <script src="convert.js"></script>
 <script src="home.js"></script>
+<script src="prices.js"></script>
 </body>
 </html>
