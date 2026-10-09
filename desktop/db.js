@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS records(
   PRIMARY KEY(project, coll, id));
 CREATE TABLE IF NOT EXISTS kv(key TEXT PRIMARY KEY, value TEXT);
 `;
-const COLLS = ['doc', 'history', 'boq', 'groups', 'tasks', 'events', 'installs', 'supplies', 'expenses', 'sections', 'team', 'equip', 'rates', 'risks', 'conditions', 'workers', 'attend'];
+const COLLS = ['doc', 'history', 'boq', 'groups', 'tasks', 'events', 'installs', 'supplies', 'expenses', 'sections', 'team', 'equip', 'rates', 'risks', 'conditions', 'workers', 'attend', 'photos', 'weeks', 'archive'];
 const DAY = 864e5;
 
 class Store {

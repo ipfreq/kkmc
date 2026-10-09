@@ -124,7 +124,7 @@
   function projectDocs(st) {
     var meta = JSON.parse(JSON.stringify(st.meta)); delete meta.updated;
     var out = { 'project/meta': meta, 'project/report': st.report, 'project/settings': { expCats: st.expCats, v: 1 } };
-    ['boq', 'groups', 'tasks', 'events', 'installs', 'supplies', 'expenses', 'sections', 'team', 'equip', 'rates', 'risks', 'conditions', 'workers', 'attend'].forEach(function (c) {
+    ['boq', 'groups', 'tasks', 'events', 'installs', 'supplies', 'expenses', 'sections', 'team', 'equip', 'rates', 'risks', 'conditions', 'workers', 'attend', 'photos', 'weeks', 'archive'].forEach(function (c) {
       (st[c] || []).forEach(function (r, i) { var b = JSON.parse(JSON.stringify(r)); b._o = i; out[c + '/' + r.id] = b; });
     });
     return out;

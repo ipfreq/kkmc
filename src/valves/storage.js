@@ -12,14 +12,18 @@ var DL=null;
 function canPrint(){return !HOST||!!HOST.print}
 
 /* ================= shared database (published page) ================= */
-var DBCOLS=['boq','groups','tasks','events','installs','supplies','expenses','sections','team','equip','rates','risks','conditions','workers','attend'];
+var DBCOLS=['boq','groups','tasks','events','installs','supplies','expenses','sections','team','equip','rates','risks','conditions','workers','attend','photos','weeks','archive'];
 var DB={api:null,on:false,last:{},timer:0,busy:false,again:false,ro:false,status:HOST?'loading':'off',at:0,err:''};
 function canon(o){if(Array.isArray(o))return '['+o.map(canon).join(',')+']';if(o&&typeof o==='object'){return '{'+Object.keys(o).filter(function(k){return o[k]!==undefined}).sort().map(function(k){return JSON.stringify(k)+':'+canon(o[k])}).join(',')+'}'}return JSON.stringify(o===undefined?null:o)}
+/* photos and saved reports carry large strings: compare them by a short signature and keep them out of the edit timeline */
+var HEAVY={photos:1,archive:1};
+function sig(v){return typeof v==='string'&&v.length>200?'#'+v.length+':'+v.slice(-40):v}
+function canonDoc(p,b){if(b&&HEAVY[p.split('/')[0]]){var x=Object.assign({},b);if('src' in x)x.src=sig(x.src);if('z' in x)x.z=sig(x.z);return canon(x)}return canon(b)}
 var IDOK=/^[A-Za-z0-9_\-.~:@+]{1,120}$/;
 function projDocs(){var m=clone(state.meta);delete m.updated;return {'project/meta':m,'project/report':clone(state.report),'project/settings':{expCats:state.expCats.slice(),v:state.v||1}}}
 function dbDocs(){
   var out=projDocs();
-  DBCOLS.forEach(function(c){state[c].forEach(function(r,i){if(!IDOK.test(r.id||''))r.id=uid(c.charAt(0));var b=clone(r);b._o=i;out[c+'/'+r.id]=b})});
+  DBCOLS.forEach(function(c){state[c].forEach(function(r,i){if(!IDOK.test(r.id||''))r.id=uid(c.charAt(0));var b=HEAVY[c]?Object.assign({},r):clone(r);b._o=i;out[c+'/'+r.id]=b})});
   return out;
 }
 function localDoc(p){
@@ -59,9 +63,9 @@ function dbInit(){
       if(any){
         var next=clone(state);
         DBCOLS.forEach(function(c){next[c]=[]});
-        snaps.forEach(function(s,k){var c=cols[k];s.docs.forEach(function(d){DB.last[c+'/'+d.id]=canon(d.data())})});
+        var raw={};snaps.forEach(function(s,k){var c=cols[k];s.docs.forEach(function(d){var p=c+'/'+d.id;raw[p]=d.data();DB.last[p]=canonDoc(p,raw[p])})});
         var cur=state;state=next;
-        Object.keys(DB.last).forEach(function(p){applyRemote(p,JSON.parse(DB.last[p]))});
+        Object.keys(raw).forEach(function(p){applyRemote(p,raw[p])});
         DBCOLS.forEach(resort);
         if(!snaps[0].docs.length)state.meta=cur.meta;
         state=normalize(state);
@@ -70,7 +74,7 @@ function dbInit(){
       }else if(HOST.blank){
         var d0=todayNum();
         state.meta=Object.assign(state.meta,{client:'',po:'',location:'',engineer:'',value:'',start:iso(d0),end:iso(d0+179),kind:'works',terms:{}});
-        ['boq','installs','supplies','expenses','events','sections','team','equip','rates','risks','conditions','workers','attend'].forEach(function(k){state[k]=[]});
+        ['boq','installs','supplies','expenses','events','sections','team','equip','rates','risks','conditions','workers','attend','photos','weeks','archive'].forEach(function(k){state[k]=[]});
         state.groups=[{id:'g1',name:'المواعيد التعاقدية',color:0},{id:'g2',name:'الأعمال التحضيرية والاعتمادات',color:1},{id:'g3',name:'التوريد',color:2},{id:'g4',name:'التنفيذ والتركيب',color:4}];
         state.expCats=['مواد ومستلزمات','مسامير وجوانات وفلنجات','مواد مدنية وأسفلت','عمالة ويوميات','معدات وإيجارات','نقل ومحروقات','إعاشة وسكن','رسوم وتصاريح','أخرى'];
         state.tasks=state.tasks.filter(function(t){return t.ms}).map(function(t){t.preds=[];t.nb=t.code==='A1000'?iso(d0):iso(d0+179);t.bs='';t.bf='';return t});
@@ -89,12 +93,12 @@ function dbInit(){
 function onRemote(c,snap){
   var changed=false,touched={};
   snap.docChanges().forEach(function(ch){
-    var p=c+'/'+ch.doc.id,local=localDoc(p),lj=local?canon(local):null;
+    var p=c+'/'+ch.doc.id,local=localDoc(p),lj=local?canonDoc(p,local):null;
     if(ch.type==='removed'){
       if(DB.last[p]!=null&&lj===DB.last[p]){applyRemote(p,null);delete DB.last[p];changed=true;touched[c]=1}
       return;
     }
-    var j=canon(ch.doc.data());
+    var j=canonDoc(p,ch.doc.data());
     if(j===DB.last[p])return;
     var pendingLocal=(lj!==(DB.last[p]==null?null:DB.last[p]));
     if(pendingLocal&&lj!==j)return;
@@ -107,7 +111,7 @@ function dbSettle(){if(!DB.on)return Promise.resolve();if(DB.timer){clearTimeout
 function dbFlush(){
   if(DB.busy){DB.again=true;return}
   var want=dbDocs(),ops=[];
-  Object.keys(want).forEach(function(p){var j=canon(want[p]);if(DB.last[p]!==j)ops.push({p:p,b:want[p],j:j})});
+  Object.keys(want).forEach(function(p){var j=canonDoc(p,want[p]);if(DB.last[p]!==j)ops.push({p:p,b:want[p],j:j})});
   Object.keys(DB.last).forEach(function(p){if(!(p in want))ops.push({p:p,del:true})});
   if(!ops.length){DB.status='ok';renderStatus();return}
   DB.busy=true;DB.status='saving';renderStatus();
@@ -178,7 +182,7 @@ function fdbWrite(){
 function fdbBoot(){if(!fdbSupported())return;idbGet('fdb').then(function(h){if(!h)return;FDB.handle=h;FDB.name=h.name;FDB.status='perm';renderAll()})}
 
 /* ================= change hook + status ================= */
-function cacheLocal(){if(DESK)return;ls(function(){localStorage.setItem(KEY,JSON.stringify({rev:state.rev,at:Date.now(),state:state}))})}
+function cacheLocal(){if(DESK)return;ls(function(){localStorage.setItem(KEY,JSON.stringify({rev:state.rev,at:Date.now(),state:lightState()}))})}
 function afterChange(){if(DB.on)dbQueue();if(FDB.handle)fdbQueue()}
 function hm(t){var d=new Date(t);return pad(d.getHours())+':'+pad(d.getMinutes())}
 function storageChip(){
@@ -432,8 +436,8 @@ function exportXlsx(full){
 /* ================= edit timeline: every change is kept as a reversible diff ================= */
 var TL={entries:[],pos:0,pending:null,cap:DESK?3000:400,loaded:false,chain:Promise.resolve()};
 var TLKEY=KEY+'-timeline';
-var TLNAMES={workers:'العمال',attend:'الحضور والانصراف',boq:'حصر الأعمال',groups:'مجموعات الجدول',tasks:'الجدول الزمني',events:'الإيقاف والمدد',installs:'سجل التنفيذ',supplies:'التوريدات',expenses:'المصاريف',sections:'خطة العمل',team:'فريق العمل',equip:'المعدات',rates:'معدلات الإنتاج',risks:'المخاطر',conditions:'الشروط'};
-function tlDocs(){var d=dbDocs(),m={};Object.keys(d).forEach(function(p){m[p]={b:d[p],j:canon(d[p])}});return m}
+var TLNAMES={weeks:'التقرير الأسبوعي',workers:'العمال',attend:'الحضور والانصراف',boq:'حصر الأعمال',groups:'مجموعات الجدول',tasks:'الجدول الزمني',events:'الإيقاف والمدد',installs:'سجل التنفيذ',supplies:'التوريدات',expenses:'المصاريف',sections:'خطة العمل',team:'فريق العمل',equip:'المعدات',rates:'معدلات الإنتاج',risks:'المخاطر',conditions:'الشروط'};
+function tlDocs(){var d=dbDocs(),m={};Object.keys(d).forEach(function(p){if(HEAVY[p.split('/')[0]])return;m[p]={b:d[p],j:canon(d[p])}});return m}
 function tlLabel(ch){
   var g={},out=[];
   ch.forEach(function(c){var s=c.p.split('/'),k=s[0]==='project'?'p:'+s[1]:s[0],t=c.b==null?'add':c.a==null?'del':'edit';g[k]=g[k]||{add:0,del:0,edit:0};g[k][t]++});

@@ -47,7 +47,7 @@ def app_js():
     marker = '/*@@MODULES@@*/'
     if app.count(marker) != 1:
         raise SystemExit('module marker missing in app.js')
-    app = app.replace(marker, (HERE / 'storage.js').read_text(encoding='utf-8') + '\n' + (HERE / 'labor.js').read_text(encoding='utf-8'))
+    app = app.replace(marker, (HERE / 'storage.js').read_text(encoding='utf-8') + '\n' + (HERE / 'labor.js').read_text(encoding='utf-8') + '\n' + (HERE / 'weekly.js').read_text(encoding='utf-8'))
     return (HERE / 'data.js').read_text(encoding='utf-8') + '\n' + (HERE / 'convert.js').read_text(encoding='utf-8') + '\n' + app
 
 
