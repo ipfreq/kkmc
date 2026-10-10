@@ -1,13 +1,16 @@
 // Project Tracker desktop program: main process.
 // Copyright (c) 2026 Yasser Mohamed Abdelgaber. All rights reserved.
 'use strict';
-const { app, BrowserWindow, ipcMain, dialog, shell, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, Menu, clipboard } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const { Store } = require('./db');
+const { License } = require('./license');
 
 const APP_TITLE = 'متابعة المشاريع';
-let store, win;
+let store, win, lic;
+const LICENSE_PAGE = () => path.join(__dirname, 'renderer', 'license.html');
+const HOME_PAGE = () => path.join(__dirname, 'renderer', 'home.html');
 const pendingImports = new Map();
 
 if (!app.requestSingleInstanceLock()) app.quit();
@@ -30,8 +33,11 @@ function createWindow() {
   win.once('ready-to-show', () => { win.maximize(); win.show(); });
   win.on('page-title-updated', e => { e.preventDefault(); });
   win.webContents.setWindowOpenHandler(({ url }) => { if (/^https?:/.test(url)) shell.openExternal(url); return { action: 'deny' }; });
-  win.webContents.on('will-navigate', (e, url) => { if (!url.startsWith('file:')) { e.preventDefault(); shell.openExternal(url); } });
-  win.loadFile(path.join(__dirname, 'renderer', 'home.html'));
+  win.webContents.on('will-navigate', (e, url) => {
+    if (!url.startsWith('file:')) { e.preventDefault(); shell.openExternal(url); return; }
+    if (!lic.allowed() && !/license\.html/.test(url)) { e.preventDefault(); win.loadFile(LICENSE_PAGE()); }
+  });
+  win.loadFile(lic.allowed() ? HOME_PAGE() : LICENSE_PAGE());
 }
 
 /* ---- work-plan projects (lift stations): the plan page is the offline plan app with this project's data ---- */
@@ -83,7 +89,23 @@ async function saveAs(sender, name, bytes) {
 }
 
 function handlers() {
-  const h = (ch, fn) => ipcMain.handle(ch, (e, ...a) => fn(e, ...a));
+  // without a license (trial over) only the license page, app info and copying the database out stay available
+  const OPEN = /^(lic:|app:info$|app:copy$|db:export$|app:openData$|app:backup$)/;
+  const h = (ch, fn) => ipcMain.handle(ch, (e, ...a) => {
+    if (!OPEN.test(ch) && !lic.allowed()) { if (win) win.loadFile(LICENSE_PAGE()); throw new Error('license'); }
+    return fn(e, ...a);
+  });
+  h('lic:status', () => lic.status());
+  h('lic:activate', (e, key) => { const r = lic.activate(key); return r; });
+  h('lic:open', () => { win.loadFile(LICENSE_PAGE()); return true; });
+  h('lic:home', () => { if (lic.allowed()) win.loadFile(HOME_PAGE()); return lic.allowed(); });
+  h('lic:issuer', async e => {
+    const r = await dialog.showOpenDialog(BrowserWindow.fromWebContents(e.sender), { title: 'ملف مفتاح إصدار التراخيص', properties: ['openFile'], filters: [{ name: 'مفتاح خاص', extensions: ['pem'] }] });
+    if (r.canceled || !r.filePaths[0]) return null;
+    try { return lic.loadIssuer(fs.readFileSync(r.filePaths[0], 'utf8')); } catch (err) { return false; }
+  });
+  h('lic:issue', (e, device, expires) => lic.issue(device, expires));
+  h('app:copy', (e, text) => { clipboard.writeText(String(text || '')); return true; });
   h('db:list', (e, p, c) => store.list(p, c));
   h('db:set', (e, p, docPath, data) => { store.set(p, docPath, data); return true; });
   h('db:del', (e, p, docPath) => { store.del(p, docPath); return true; });
@@ -167,6 +189,13 @@ app.whenReady().then(async () => {
     dialog.showErrorBox(APP_TITLE, 'تعذّر فتح قاعدة البيانات:\n' + store.file + '\n\n' + (err && err.message));
     app.quit(); return;
   }
+  lic = new License(app.getPath('userData'));
+  lic.loadTrial(store);
+  // keep the trial clock moving forward and close the app's pages when the trial runs out mid-session
+  setInterval(() => {
+    lic.saveTrial(store);
+    if (!lic.allowed() && win && !/license\.html/.test(win.webContents.getURL())) win.loadFile(LICENSE_PAGE());
+  }, 10 * 60 * 1000);
   handlers();
   createWindow();
 });

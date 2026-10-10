@@ -161,3 +161,23 @@ dialog.full{width:min(1260px,calc(100vw - 24px));height:calc(100vh - 32px);max-h
   .inv-t thead{display:table-header-group} .inv-t tr{break-inside:avoid}
   *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
+/* license */
+.lic-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:var(--accent-soft);border:1px solid color-mix(in srgb,var(--accent) 35%,var(--line));border-radius:var(--radius);padding:9px 14px;font-size:13.5px}
+.lic-bar.warn{background:var(--warn-soft);border-color:color-mix(in srgb,var(--warn) 40%,var(--line))}
+#lic-state{color:var(--accent)}
+.lic{max-width:760px;margin-inline:auto;width:100%;display:flex;flex-direction:column;gap:16px}
+.lic .card:hover{border-color:var(--line)}
+.lic-head{display:flex;flex-direction:column;gap:4px}
+.lic-head h2{font-size:22px} .lic-head p{margin:0;color:var(--muted)}
+.lic-head.bad h2{color:var(--bad)} .lic-head.ok h2{color:var(--ok)}
+.dev{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--surface-2);border-radius:10px;padding:12px 16px}
+.dev code{font-family:Consolas,'Courier New',monospace;font-size:26px;font-weight:700;letter-spacing:2px;direction:ltr;flex:1;text-align:center;user-select:all}
+.lic textarea.in{width:100%;font-family:Consolas,'Courier New',monospace;direction:ltr;text-align:left;font-size:14px;resize:vertical;min-height:84px}
+.lic .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.lic .msg{margin:0;font-size:13.5px} .lic .msg.bad{color:var(--bad)} .lic .msg.ok{color:var(--ok)}
+.lic details{border:1px dashed var(--line);border-radius:var(--radius);padding:10px 14px;background:var(--surface)}
+.lic summary{cursor:pointer;color:var(--muted);font-size:13px}
+.lic details[open] summary{margin-bottom:10px}
+.lic .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.lic label.f .in{width:100%}
+.lic textarea.in::placeholder{direction:rtl;text-align:right;font-family:var(--font-body);letter-spacing:0}

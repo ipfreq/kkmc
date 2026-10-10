@@ -196,6 +196,16 @@
     if (t === 'export') exportDb(); else if (t === 'load') loadDb(); else if (t === 'reset') resetApp();
   });
 
+  /* license: trial banner and state in the footer */
+  if (api.license) api.license().then(function (l) {
+    var bar = $('#lic-bar');
+    if (l.state === 'trial') {
+      bar.innerHTML = '<span><b>نسخة تجريبية</b> – متبقٍ ' + l.daysLeft + (l.daysLeft === 1 ? ' يوم' : l.daysLeft === 2 ? ' يومان' : ' أيام') + ' على انتهاء الفترة التجريبية.</span><button class="btn sm primary" data-lic>تفعيل البرنامج</button>';
+      bar.hidden = false; bar.classList.toggle('warn', l.daysLeft <= 2);
+    }
+    $('#lic-state').textContent = l.state === 'licensed' ? '· مرخص لهذا الجهاز' + (l.expires ? ' حتى ' + new Date(l.expires).toISOString().slice(0, 10) : '') : l.state === 'trial' ? '· نسخة تجريبية' : '';
+  });
+  document.addEventListener('click', function (e) { if (e.target.closest('[data-lic]')) api.licenseOpen(); });
   setupDefaults().then(function (added) {
     if (added) toast('تم تجهيز المشاريع الافتراضية: مشروع المحابس، والأعمال المتبقية في محطات الرفع.');
     load();

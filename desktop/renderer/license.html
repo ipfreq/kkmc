@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="author" content="Yasser Mohamed Abdelgaber">
+<meta name="copyright" content="© 2026 Yasser Mohamed Abdelgaber. All rights reserved.">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:">
+<title>تفعيل البرنامج – متابعة المشاريع</title>
+<link rel="stylesheet" href="fonts.css">
+<link rel="stylesheet" href="home.css">
+</head>
+<body>
+<div id="app">
+  <header class="top">
+    <div class="brand">
+      <div class="mark" aria-hidden="true"><i></i><i></i><i></i></div>
+      <div><span class="eyebrow">برنامج متابعة مشاريع المقاولات</span><h1>متابعة المشاريع</h1></div>
+    </div>
+  </header>
+  <main class="lic">
+    <section class="card"><div id="head" class="lic-head"><h2>جارٍ التحقق من الترخيص…</h2></div>
+      <div class="row" id="head-acts"></div></section>
+    <section class="card">
+      <h2 style="font-size:16px">رقم هذا الجهاز</h2>
+      <p class="msg">أرسل هذا الرقم للمطور للحصول على رقم الترخيص الخاص بهذا الجهاز. كل جهاز له رقم مختلف وترخيص مختلف.</p>
+      <div class="dev"><code id="dev">—</code><button class="btn" id="copy-dev">نسخ الرقم</button></div>
+    </section>
+    <section class="card">
+      <h2 style="font-size:16px">إدخال رقم الترخيص</h2>
+      <textarea id="key" class="in" rows="3" spellcheck="false" placeholder="الصق رقم الترخيص هنا"></textarea>
+      <div class="row"><button class="btn primary" id="activate">تفعيل البرنامج</button><p id="msg" class="msg" role="status"></p></div>
+    </section>
+    <section class="card">
+      <p class="msg">بياناتك ومشاريعك محفوظة على هذا الجهاز ولا تُحذف عند انتهاء الفترة التجريبية، وتظهر كما هي بعد التفعيل.</p>
+      <div class="row"><button class="btn sm" id="export">نسخ قاعدة البيانات</button><button class="btn sm" id="folder">فتح مجلد البيانات</button></div>
+    </section>
+    <details id="issuer">
+      <summary>إصدار ترخيص لجهاز (للمطور فقط)</summary>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <p class="msg">يحتاج ملف المفتاح الخاص بإصدار التراخيص (ProjectTracker-private-key.pem). لا تشارك هذا الملف مع أي شخص.</p>
+        <div class="row"><button class="btn sm" id="pick">اختيار ملف المفتاح الخاص</button><span id="pick-msg" class="msg"></span></div>
+        <div class="two"><label class="f">رقم جهاز العميل<input class="in" id="i-dev" dir="ltr" placeholder="XXXX-XXXX-XXXX-XXXX"></label>
+          <label class="f">ينتهي في (اتركه فارغاً لترخيص دائم)<input class="in" type="date" id="i-exp"></label></div>
+        <div class="row"><button class="btn sm" id="i-this">استخدام رقم هذا الجهاز</button><button class="btn sm primary" id="i-go" disabled>إصدار رقم الترخيص</button></div>
+        <textarea id="i-out" class="in" rows="3" readonly spellcheck="false" placeholder="رقم الترخيص يظهر هنا"></textarea>
+        <div class="row"><button class="btn sm" id="i-copy" disabled>نسخ رقم الترخيص</button></div>
+      </div>
+    </details>
+  </main>
+  <footer class="foot"><p class="credit">متابعة المشاريع · تصميم وبرمجة: م. ياسر محمد عبدالجابر · © <span id="yr">2026</span> جميع الحقوق محفوظة <span id="ver"></span></p></footer>
+</div>
+<div id="toast" class="toast" role="status" hidden></div>
+<script src="activate.js"></script>
+</body>
+</html>

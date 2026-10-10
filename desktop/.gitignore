@@ -5,3 +5,6 @@ renderer/fonts.css
 renderer/plan-app.html
 renderer/data.js
 renderer/convert.js
+
+# license signing keys must never be committed
+*.pem

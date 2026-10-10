@@ -32,5 +32,12 @@ contextBridge.exposeInMainWorld('DESKTOP', {
   exportDb: () => call('db:export'),
   pickDb: () => call('db:pick'),
   loadDb: (file, mode) => call('db:load', file, mode),
-  wipeDb: () => call('db:wipe')
+  wipeDb: () => call('db:wipe'),
+  license: () => call('lic:status'),
+  activate: key => call('lic:activate', key),
+  licenseOpen: () => call('lic:open'),
+  licenseHome: () => call('lic:home'),
+  issuerKey: () => call('lic:issuer'),
+  issue: (device, expires) => call('lic:issue', device, expires),
+  copy: text => call('app:copy', text)
 });
